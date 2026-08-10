@@ -1,25 +1,31 @@
-import { axiosClient } from "./axiosClient";
+import { axiosClient, type ApiResponse } from "./axiosClient";
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+}
 
 export interface AuthResponse {
   token: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-  };
+  user: AuthUser;
 }
 
 export const authApi = {
-  login: async (email: string, password: string): Promise<AuthResponse> => {
-    const { data } = await axiosClient.post<AuthResponse>("/auth/login", { email, password });
-    return data;
-  },
   register: async (name: string, email: string, password: string): Promise<AuthResponse> => {
-    const { data } = await axiosClient.post<AuthResponse>("/auth/register", { name, email, password });
-    return data;
+    const { data } = await axiosClient.post<ApiResponse<AuthResponse>>("/auth/register", {
+      name,
+      email,
+      password,
+    });
+    return data.data;
   },
-  me: async (): Promise<AuthResponse["user"]> => {
-    const { data } = await axiosClient.get<AuthResponse["user"]>("/auth/me");
-    return data;
+  login: async (email: string, password: string): Promise<AuthResponse> => {
+    const { data } = await axiosClient.post<ApiResponse<AuthResponse>>("/auth/login", { email, password });
+    return data.data;
+  },
+  getMe: async (): Promise<AuthUser> => {
+    const { data } = await axiosClient.get<ApiResponse<AuthUser>>("/auth/me");
+    return data.data;
   },
 };
