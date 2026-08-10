@@ -1,18 +1,18 @@
 import { Schema, model } from "mongoose";
 
-export interface User {
+export interface IUser {
   name: string;
   email: string;
   passwordHash: string;
 }
 
-const userSchema = new Schema<User>(
+const userSchema = new Schema<IUser>(
   {
     name: { type: String, required: true },
-    email: { type: String, required: true, unique: true, index: true },
-    passwordHash: { type: String, required: true },
+    email: { type: String, required: true, unique: true, lowercase: true, index: true },
+    passwordHash: { type: String, required: true, select: false },
   },
   { timestamps: true },
 );
 
-export const UserModel = model<User>("User", userSchema);
+export const UserModel = model<IUser>("User", userSchema);
