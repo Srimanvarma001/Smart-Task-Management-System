@@ -1,0 +1,24 @@
+name: CI
+on:
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        workspace: [client, server]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+        working-directory: ${{ matrix.workspace }}
+      - run: npm run typecheck
+        working-directory: ${{ matrix.workspace }}
+      - run: npm run lint
+        working-directory: ${{ matrix.workspace }}
+      - run: npm test -- --ci
+        working-directory: ${{ matrix.workspace }}
