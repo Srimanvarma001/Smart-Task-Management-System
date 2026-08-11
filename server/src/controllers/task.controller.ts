@@ -64,3 +64,13 @@ export const deleteTask = asyncHandler(async (req: Request, res: Response) => {
   await taskService.deleteTask(userId, req.params.id);
   res.status(200).json(ok({ message: "Task deleted" }));
 });
+
+export const getTaskStats = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const stats = await taskService.getTaskStats(userId);
+  res.status(200).json(ok(stats));
+});

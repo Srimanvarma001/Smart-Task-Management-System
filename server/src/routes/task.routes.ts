@@ -3,6 +3,7 @@ import {
   createTask,
   deleteTask,
   getTask,
+  getTaskStats,
   listTasks,
   updateTask,
   updateTaskStatus,
@@ -17,6 +18,7 @@ router.use(authenticate);
 
 router.get("/", validate(querySchema, "query"), listTasks);
 router.post("/", validate(createTaskSchema), createTask);
+router.get("/stats", getTaskStats);
 router.get("/:id", getTask);
 router.put("/:id", validate(updateTaskSchema), updateTask);
 router.patch("/:id/status", updateTaskStatus);

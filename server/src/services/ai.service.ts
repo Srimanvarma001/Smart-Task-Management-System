@@ -86,12 +86,16 @@ export const aiService = {
   async parseTaskFromText(_userId: string, text: string): Promise<ParsedTask> {
     requireText(text);
 
+    const today = new Date().toISOString().split("T")[0];
+
     const raw = await callDeepSeek(
       [
         {
           role: "system",
           content:
-            "You are a task parsing assistant. Extract the task from the user's free text and return STRICT JSON ONLY with exactly these fields: title (string, required), dueDate (ISO 8601 string or null), priority (" +
+            "Today's date is " +
+            today +
+            ". Use this as the reference point for resolving any relative dates mentioned in the task text (e.g. 'tomorrow', 'friday', 'next week'). You are a task parsing assistant. Extract the task from the user's free text and return STRICT JSON ONLY with exactly these fields: title (string, required), dueDate (ISO 8601 string or null), priority (" +
             PRIORITIES.join(", ") +
             " or null), category (short string or null). No prose, no markdown fences, no code blocks.",
         },

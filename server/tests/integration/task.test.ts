@@ -442,6 +442,105 @@ describe("single task operations (GET/PUT/PATCH/DELETE /tasks/:id)", () => {
   });
 });
 
+describe("GET /api/tasks/stats", () => {
+  let userA: TestUser;
+  let userB: TestUser;
+
+  beforeAll(async () => {
+    userA = await registerAndLogin("stats-a");
+    userB = await registerAndLogin("stats-b");
+  });
+
+  it("returns zeroed stats when the user has no tasks", async () => {
+    const res = await request(app)
+      .get("/api/tasks/stats")
+      .set("Authorization", `Bearer ${userA.token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({
+      total: 0,
+      completed: 0,
+      pending: 0,
+      overdue: 0,
+      byPriority: { high: 0, medium: 0, low: 0 },
+      completionRate: 0,
+    });
+  });
+
+  it("reports total, completed, pending, overdue, byPriority and completionRate", async () => {
+    const pendingHigh = await createTask(userA.token, "Pending high", {
+      priority: "high",
+      dueDate: "2030-01-01",
+    });
+    const overduePending = await createTask(userA.token, "Overdue pending", {
+      priority: "low",
+      dueDate: "2020-01-01",
+    });
+    const doneHigh = await createTask(userA.token, "Done high", { priority: "high" });
+    const doneMedium = await createTask(userA.token, "Done medium", { priority: "medium" });
+    const doneMedium2 = await createTask(userA.token, "Done medium 2", { priority: "medium" });
+    const doneLow = await createTask(userA.token, "Done low", { priority: "low" });
+
+    for (const task of [doneHigh, doneMedium, doneMedium2, doneLow]) {
+      const patch = await request(app)
+        .patch(`/api/tasks/${task._id}/status`)
+        .set("Authorization", `Bearer ${userA.token}`);
+      expect(patch.status).toBe(200);
+    }
+
+    const res = await request(app)
+      .get("/api/tasks/stats")
+      .set("Authorization", `Bearer ${userA.token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({
+      total: 6,
+      completed: 4,
+      pending: 2,
+      overdue: 1,
+      byPriority: { high: 2, medium: 2, low: 2 },
+      completionRate: 67,
+    });
+  });
+
+  it("scopes stats to the authenticated user only", async () => {
+    const bCompleted = await createTask(userB.token, "B completed", { priority: "high" });
+    await request(app)
+      .patch(`/api/tasks/${bCompleted._id}/status`)
+      .set("Authorization", `Bearer ${userB.token}`);
+    await createTask(userB.token, "B pending", { priority: "low" });
+    await createTask(userB.token, "B overdue", { priority: "low", dueDate: "2020-01-01" });
+
+    const aRes = await request(app)
+      .get("/api/tasks/stats")
+      .set("Authorization", `Bearer ${userA.token}`);
+
+    expect(aRes.status).toBe(200);
+    expect(aRes.body.data).toEqual({
+      total: 6,
+      completed: 4,
+      pending: 2,
+      overdue: 1,
+      byPriority: { high: 2, medium: 2, low: 2 },
+      completionRate: 67,
+    });
+
+    const bRes = await request(app)
+      .get("/api/tasks/stats")
+      .set("Authorization", `Bearer ${userB.token}`);
+
+    expect(bRes.status).toBe(200);
+    expect(bRes.body.data).toEqual({
+      total: 3,
+      completed: 1,
+      pending: 2,
+      overdue: 1,
+      byPriority: { high: 1, medium: 0, low: 2 },
+      completionRate: 33,
+    });
+  });
+});
+
 describe("task routes require authentication", () => {
   it.each([
     { label: "POST /api/tasks", req: request(app).post("/api/tasks").send({ title: "x" }) },

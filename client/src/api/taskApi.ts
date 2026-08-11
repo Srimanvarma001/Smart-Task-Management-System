@@ -7,11 +7,24 @@ import type {
   UpdateTaskPayload,
 } from "../features/tasks/types";
 
+export interface TaskStats {
+  total: number;
+  completed: number;
+  pending: number;
+  overdue: number;
+  byPriority: { high: number; medium: number; low: number };
+  completionRate: number;
+}
+
 export const taskApi = {
   listTasks: async (filters: TaskFilters): Promise<TaskListResponse> => {
     const { data } = await axiosClient.get<ApiResponse<TaskListResponse>>("/tasks", {
       params: filters,
     });
+    return data.data;
+  },
+  getTaskStats: async (): Promise<TaskStats> => {
+    const { data } = await axiosClient.get<ApiResponse<TaskStats>>("/tasks/stats");
     return data.data;
   },
   getTask: async (id: string): Promise<Task> => {
