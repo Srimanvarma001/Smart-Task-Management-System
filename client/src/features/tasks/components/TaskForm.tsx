@@ -7,6 +7,7 @@ import type { Task, TaskPriority } from "../types";
 
 interface TaskFormProps {
   task?: Task | null;
+  initialValues?: Partial<Task>;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
@@ -29,22 +30,31 @@ interface FormErrors {
 const inputClass =
   "w-full rounded border border-ink/20 bg-white px-3 py-2 text-sm text-ink placeholder:text-ink/40 focus:border-focus focus:outline-none focus:ring-1 focus:ring-focus dark:border-paper/20 dark:bg-ink dark:text-paper";
 
-const initialForm = (task?: Task | null): FormState => ({
-  title: task?.title ?? "",
-  description: task?.description ?? "",
-  dueDate: task?.dueDate ? task.dueDate.slice(0, 10) : "",
-  priority: task?.priority ?? "medium",
-  category: task?.category ?? "",
-  tags: task?.tags.join(", ") ?? "",
-});
+function toDateInputValue(value: string | undefined): string {
+  if (!value) return "";
+  return value.slice(0, 10);
+}
 
-export default function TaskForm({ task, onSuccess, onCancel }: TaskFormProps) {
+// task (editing) takes priority over initialValues (AI prefill on create)
+const initialForm = (task?: Task | null, initialValues?: Partial<Task>): FormState => {
+  const source = task ?? initialValues;
+  return {
+    title: source?.title ?? "",
+    description: source?.description ?? "",
+    dueDate: toDateInputValue(source?.dueDate),
+    priority: source?.priority ?? "medium",
+    category: source?.category ?? "",
+    tags: task?.tags?.join(", ") ?? "",
+  };
+};
+
+export default function TaskForm({ task, initialValues, onSuccess, onCancel }: TaskFormProps) {
   const isEditing = Boolean(task);
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
   const mutation = isEditing ? updateTask : createTask;
 
-  const [form, setForm] = useState<FormState>(() => initialForm(task));
+  const [form, setForm] = useState<FormState>(() => initialForm(task, initialValues));
   const [errors, setErrors] = useState<FormErrors>({});
   const [saved, setSaved] = useState(false);
 
@@ -85,6 +95,8 @@ export default function TaskForm({ task, onSuccess, onCancel }: TaskFormProps) {
         .split(",")
         .map((tag) => tag.trim())
         .filter(Boolean),
+      // only relevant on create: marks a task that originated from AI parsing
+      ...(isEditing ? {} : { aiGenerated: Boolean(initialValues?.aiGenerated) }),
     };
 
     try {

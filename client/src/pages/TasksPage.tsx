@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import Navbar from "../components/layout/Navbar";
 import Sidebar from "../components/layout/Sidebar";
 import Modal from "../components/ui/Modal";
+import NLTaskInput from "../features/ai/components/NLTaskInput";
 import { useTasks } from "../features/tasks/hooks/useTasks";
 import TaskFilters from "../features/tasks/components/TaskFilters";
 import TaskForm from "../features/tasks/components/TaskForm";
@@ -60,6 +61,8 @@ export default function TasksPage() {
               New task
             </button>
           </div>
+
+          <NLTaskInput />
 
           <TaskFilters filters={filters} categories={categories} onChange={updateFilters} />
 

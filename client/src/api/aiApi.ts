@@ -1,16 +1,34 @@
-import { axiosClient } from "./axiosClient";
+import { axiosClient, type ApiResponse } from "./axiosClient";
+import type { TaskPriority } from "../features/tasks/types";
+
+export interface ParsedTask {
+  title: string;
+  dueDate?: string;
+  priority: TaskPriority;
+  category?: string;
+}
+
+export interface TaskSummary {
+  summary: string;
+  flags: string[];
+}
+
+export interface TaskSuggestion {
+  title: string;
+  reason: string;
+}
 
 export const aiApi = {
-  parse: async (text: string) => {
-    const { data } = await axiosClient.post("/ai/parse", { text });
-    return data;
+  parseTask: async (text: string): Promise<ParsedTask> => {
+    const { data } = await axiosClient.post<ApiResponse<ParsedTask>>("/ai/parse", { text });
+    return data.data;
   },
-  summary: async () => {
-    const { data } = await axiosClient.get("/ai/summary");
-    return data;
+  getSummary: async (): Promise<TaskSummary> => {
+    const { data } = await axiosClient.get<ApiResponse<TaskSummary>>("/ai/summary");
+    return data.data;
   },
-  suggestions: async () => {
-    const { data } = await axiosClient.get("/ai/suggestions");
-    return data;
+  getSuggestions: async (): Promise<TaskSuggestion[]> => {
+    const { data } = await axiosClient.get<ApiResponse<TaskSuggestion[]>>("/ai/suggestions");
+    return data.data;
   },
 };

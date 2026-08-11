@@ -1,9 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { aiApi } from "../../../api/aiApi";
+import { aiApi, type TaskSuggestion } from "../../../api/aiApi";
+
+const AI_INSIGHTS_STALE_MS = 15 * 60 * 1000;
 
 export function useAISuggestions() {
-  return useQuery({
+  return useQuery<TaskSuggestion[]>({
     queryKey: ["ai", "suggestions"],
-    queryFn: () => aiApi.suggestions(),
+    queryFn: () => aiApi.getSuggestions(),
+    staleTime: AI_INSIGHTS_STALE_MS,
   });
 }
