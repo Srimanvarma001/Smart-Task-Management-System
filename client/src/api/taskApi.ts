@@ -1,37 +1,36 @@
-import { axiosClient } from "./axiosClient";
-import type { Task } from "../features/tasks/types";
-
-export interface TaskQueryParams {
-  status?: string;
-  priority?: string;
-  category?: string;
-  search?: string;
-  sort?: string;
-  page?: number;
-}
+import { axiosClient, type ApiResponse } from "./axiosClient";
+import type {
+  CreateTaskPayload,
+  Task,
+  TaskFilters,
+  TaskListResponse,
+  UpdateTaskPayload,
+} from "../features/tasks/types";
 
 export const taskApi = {
-  list: async (params?: TaskQueryParams): Promise<Task[]> => {
-    const { data } = await axiosClient.get<Task[]>("/tasks", { params });
-    return data;
+  listTasks: async (filters: TaskFilters): Promise<TaskListResponse> => {
+    const { data } = await axiosClient.get<ApiResponse<TaskListResponse>>("/tasks", {
+      params: filters,
+    });
+    return data.data;
   },
-  get: async (id: string): Promise<Task> => {
-    const { data } = await axiosClient.get<Task>(`/tasks/${id}`);
-    return data;
+  getTask: async (id: string): Promise<Task> => {
+    const { data } = await axiosClient.get<ApiResponse<Task>>(`/tasks/${id}`);
+    return data.data;
   },
-  create: async (payload: Partial<Task>): Promise<Task> => {
-    const { data } = await axiosClient.post<Task>("/tasks", payload);
-    return data;
+  createTask: async (payload: CreateTaskPayload): Promise<Task> => {
+    const { data } = await axiosClient.post<ApiResponse<Task>>("/tasks", payload);
+    return data.data;
   },
-  update: async (id: string, payload: Partial<Task>): Promise<Task> => {
-    const { data } = await axiosClient.put<Task>(`/tasks/${id}`, payload);
-    return data;
+  updateTask: async (id: string, payload: UpdateTaskPayload): Promise<Task> => {
+    const { data } = await axiosClient.put<ApiResponse<Task>>(`/tasks/${id}`, payload);
+    return data.data;
   },
-  updateStatus: async (id: string, status: Task["status"]): Promise<Task> => {
-    const { data } = await axiosClient.patch<Task>(`/tasks/${id}/status`, { status });
-    return data;
+  toggleTaskStatus: async (id: string): Promise<Task> => {
+    const { data } = await axiosClient.patch<ApiResponse<Task>>(`/tasks/${id}/status`);
+    return data.data;
   },
-  remove: async (id: string): Promise<void> => {
+  deleteTask: async (id: string): Promise<void> => {
     await axiosClient.delete(`/tasks/${id}`);
   },
 };

@@ -9,17 +9,17 @@ import {
 } from "../controllers/task.controller";
 import { authenticate } from "../middleware/auth.middleware";
 import { validate } from "../middleware/validate";
-import { createTaskSchema, updateTaskSchema, updateTaskStatusSchema } from "../validators/task.schema";
+import { createTaskSchema, querySchema, updateTaskSchema } from "../validators/task.schema";
 
 const router = Router();
 
 router.use(authenticate);
 
-router.get("/", listTasks);
+router.get("/", validate(querySchema, "query"), listTasks);
 router.post("/", validate(createTaskSchema), createTask);
 router.get("/:id", getTask);
 router.put("/:id", validate(updateTaskSchema), updateTask);
-router.patch("/:id/status", validate(updateTaskStatusSchema), updateTaskStatus);
+router.patch("/:id/status", updateTaskStatus);
 router.delete("/:id", deleteTask);
 
 export default router;
