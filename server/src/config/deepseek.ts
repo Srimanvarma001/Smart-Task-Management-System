@@ -5,7 +5,7 @@ export const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
 
 export const DEEPSEEK_MODEL = "deepseek-v4-flash";
 
-export const DEEPSEEK_MAX_TOKENS = 300;
+export const DEEPSEEK_MAX_TOKENS = 500;
 
 export const DEEPSEEK_TIMEOUT_MS = 15_000;
 
@@ -39,6 +39,7 @@ export async function callDeepSeek(messages: DeepSeekMessage[], options: DeepSee
         model: DEEPSEEK_MODEL,
         messages,
         max_tokens: options.maxTokens ?? DEEPSEEK_MAX_TOKENS,
+        thinking: { type: "disabled" },
         ...(options.json ? { response_format: { type: "json_object" } } : {}),
       }),
     });

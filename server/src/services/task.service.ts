@@ -1,5 +1,5 @@
 import { Types, type FilterQuery, type FlattenMaps, type SortOrder } from "mongoose";
-import { TaskModel, type ITask } from "../models/Task";
+import { TaskModel, type ITask, type TaskPriority } from "../models/Task";
 import { AppError } from "../utils/AppError";
 import type { CreateTaskInput, TaskQueryInput, UpdateTaskInput } from "../validators/task.schema";
 
@@ -18,6 +18,15 @@ export interface TaskListResult {
   total: number;
   page: number;
   totalPages: number;
+}
+
+export interface TaskStatsResult {
+  total: number;
+  completed: number;
+  pending: number;
+  overdue: number;
+  byPriority: Record<TaskPriority, number>;
+  completionRate: number;
 }
 
 export const taskService = {
@@ -99,5 +108,37 @@ export const taskService = {
       throw new AppError(404, "Task not found");
     }
     return task.toObject();
+  },
+
+  async getTaskStats(userId: string): Promise<TaskStatsResult> {
+    const userFilter: FilterQuery<ITask> = { userId: new Types.ObjectId(userId) };
+    const pendingFilter: FilterQuery<ITask> = { ...userFilter, status: "pending" };
+
+    const [total, completed, pending, overdue, priorityCounts] = await Promise.all([
+      TaskModel.countDocuments(userFilter),
+      TaskModel.countDocuments({ ...userFilter, status: "completed" }),
+      TaskModel.countDocuments(pendingFilter),
+      TaskModel.countDocuments({ ...pendingFilter, dueDate: { $lt: new Date() } }),
+      TaskModel.aggregate<{ _id: TaskPriority; count: number }>([
+        { $match: userFilter },
+        { $group: { _id: "$priority", count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const countFor = (priority: TaskPriority): number =>
+      priorityCounts.find((entry) => entry._id === priority)?.count ?? 0;
+
+    return {
+      total,
+      completed,
+      pending,
+      overdue,
+      byPriority: {
+        high: countFor("high"),
+        medium: countFor("medium"),
+        low: countFor("low"),
+      },
+      completionRate: total === 0 ? 0 : Math.round((completed / total) * 100),
+    };
   },
 };
