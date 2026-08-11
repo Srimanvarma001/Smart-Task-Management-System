@@ -1,35 +1,44 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { taskApi } from "../../../api/taskApi";
-import type { Task } from "../types";
+import type { CreateTaskPayload, UpdateTaskPayload } from "../types";
 
-export function useTaskMutations() {
+export function useCreateTask() {
   const queryClient = useQueryClient();
-
-  const invalidateTasks = () => {
-    void queryClient.invalidateQueries({ queryKey: ["tasks"] });
-  };
-
-  const createTask = useMutation({
-    mutationFn: (payload: Partial<Task>) => taskApi.create(payload),
-    onSuccess: invalidateTasks,
+  return useMutation({
+    mutationFn: (payload: CreateTaskPayload) => taskApi.createTask(payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
   });
+}
 
-  const updateTask = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: Partial<Task> }) =>
-      taskApi.update(id, payload),
-    onSuccess: invalidateTasks,
+export function useUpdateTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: UpdateTaskPayload }) =>
+      taskApi.updateTask(id, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
   });
+}
 
-  const updateTaskStatus = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: Task["status"] }) =>
-      taskApi.updateStatus(id, status),
-    onSuccess: invalidateTasks,
+export function useToggleTaskStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => taskApi.toggleTaskStatus(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
   });
+}
 
-  const deleteTask = useMutation({
-    mutationFn: (id: string) => taskApi.remove(id),
-    onSuccess: invalidateTasks,
+export function useDeleteTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => taskApi.deleteTask(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
   });
-
-  return { createTask, updateTask, updateTaskStatus, deleteTask };
 }

@@ -1,19 +1,10 @@
-import mongoose from "mongoose";
-import { MongoMemoryServer } from "mongodb-memory-server";
 import request from "supertest";
 import app from "../../src/app";
+import { connectTestDB, disconnectTestDB } from "./setup";
 
-let mongoServer: MongoMemoryServer;
+beforeAll(connectTestDB);
 
-beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  await mongoose.connect(mongoServer.getUri());
-});
-
-afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
-});
+afterAll(disconnectTestDB);
 
 describe("POST /api/auth/register", () => {
   it("creates a user and returns a token (201)", async () => {

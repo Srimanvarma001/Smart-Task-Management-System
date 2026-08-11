@@ -1,17 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { taskApi } from "../../../api/taskApi";
-import type { Task, TaskPriority, TaskStatus } from "../types";
+import type { TaskFilters, TaskListResponse } from "../types";
 
-interface UseTasksOptions {
-  status?: TaskStatus;
-  priority?: TaskPriority;
-  category?: string;
-  search?: string;
-}
-
-export function useTasks(options: UseTasksOptions = {}) {
-  return useQuery<Task[]>({
-    queryKey: ["tasks", options],
-    queryFn: () => taskApi.list(options),
+export function useTasks(filters: TaskFilters) {
+  return useQuery<TaskListResponse>({
+    queryKey: ["tasks", filters],
+    queryFn: () => taskApi.listTasks(filters),
   });
 }
