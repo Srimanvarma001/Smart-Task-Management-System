@@ -2,60 +2,12 @@ import { useState, type FormEvent } from "react";
 import { getApiErrorMessage } from "../../../api/axiosClient";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
-<<<<<<< HEAD
-import type { Task, TaskPriority } from "../types";
-import { useTaskMutations } from "../hooks/useTaskMutations";
-
-interface TaskFormProps {
-  initialValues?: Partial<Task>;
-  onSaved?: () => void;
-}
-
-const PRIORITIES: TaskPriority[] = ["low", "medium", "high"];
-
-function toDateInputValue(value: string | undefined): string {
-  if (!value) return "";
-  return value.slice(0, 10);
-}
-
-export default function TaskForm({ initialValues, onSaved }: TaskFormProps) {
-  const { createTask } = useTaskMutations();
-  const [title, setTitle] = useState(initialValues?.title ?? "");
-  const [description, setDescription] = useState(initialValues?.description ?? "");
-  const [dueDate, setDueDate] = useState(toDateInputValue(initialValues?.dueDate));
-  const [priority, setPriority] = useState<TaskPriority>(initialValues?.priority ?? "medium");
-  const [category, setCategory] = useState(initialValues?.category ?? "");
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError(null);
-
-    if (!title.trim()) {
-      setError("Title is required");
-      return;
-    }
-
-    createTask.mutate(
-      {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        ...(dueDate ? { dueDate: new Date(dueDate).toISOString() } : {}),
-        priority,
-        ...(category.trim() ? { category: category.trim() } : {}),
-        aiGenerated: Boolean(initialValues?.aiGenerated),
-      },
-      {
-        onSuccess: onSaved,
-        onError: (err) => setError(getApiErrorMessage(err, "Unable to save the task. Please try again.")),
-      },
-    );
-=======
 import { useCreateTask, useUpdateTask } from "../hooks/useTaskMutations";
 import type { Task, TaskPriority } from "../types";
 
 interface TaskFormProps {
   task?: Task | null;
+  initialValues?: Partial<Task>;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
@@ -78,22 +30,31 @@ interface FormErrors {
 const inputClass =
   "w-full rounded border border-ink/20 bg-white px-3 py-2 text-sm text-ink placeholder:text-ink/40 focus:border-focus focus:outline-none focus:ring-1 focus:ring-focus dark:border-paper/20 dark:bg-ink dark:text-paper";
 
-const initialForm = (task?: Task | null): FormState => ({
-  title: task?.title ?? "",
-  description: task?.description ?? "",
-  dueDate: task?.dueDate ? task.dueDate.slice(0, 10) : "",
-  priority: task?.priority ?? "medium",
-  category: task?.category ?? "",
-  tags: task?.tags.join(", ") ?? "",
-});
+function toDateInputValue(value: string | undefined): string {
+  if (!value) return "";
+  return value.slice(0, 10);
+}
 
-export default function TaskForm({ task, onSuccess, onCancel }: TaskFormProps) {
+// task (editing) takes priority over initialValues (AI prefill on create)
+const initialForm = (task?: Task | null, initialValues?: Partial<Task>): FormState => {
+  const source = task ?? initialValues;
+  return {
+    title: source?.title ?? "",
+    description: source?.description ?? "",
+    dueDate: toDateInputValue(source?.dueDate),
+    priority: source?.priority ?? "medium",
+    category: source?.category ?? "",
+    tags: task?.tags?.join(", ") ?? "",
+  };
+};
+
+export default function TaskForm({ task, initialValues, onSuccess, onCancel }: TaskFormProps) {
   const isEditing = Boolean(task);
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
   const mutation = isEditing ? updateTask : createTask;
 
-  const [form, setForm] = useState<FormState>(() => initialForm(task));
+  const [form, setForm] = useState<FormState>(() => initialForm(task, initialValues));
   const [errors, setErrors] = useState<FormErrors>({});
   const [saved, setSaved] = useState(false);
 
@@ -134,6 +95,8 @@ export default function TaskForm({ task, onSuccess, onCancel }: TaskFormProps) {
         .split(",")
         .map((tag) => tag.trim())
         .filter(Boolean),
+      // only relevant on create: marks a task that originated from AI parsing
+      ...(isEditing ? {} : { aiGenerated: Boolean(initialValues?.aiGenerated) }),
     };
 
     try {
@@ -147,57 +110,10 @@ export default function TaskForm({ task, onSuccess, onCancel }: TaskFormProps) {
     } catch (error) {
       setErrors({ form: getApiErrorMessage(error, "Unable to save task. Please try again.") });
     }
->>>>>>> origin/develop
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-<<<<<<< HEAD
-      {error && (
-        <p role="alert" className="rounded border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-600">
-          {error}
-        </p>
-      )}
-      <Input
-        placeholder="Task title"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        required
-      />
-      <Input
-        placeholder="Description (optional)"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-      />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block space-y-1">
-          <span className="font-mono text-xs text-ink/60 dark:text-paper/60">Due date</span>
-          <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-        </label>
-        <label className="block space-y-1">
-          <span className="font-mono text-xs text-ink/60 dark:text-paper/60">Priority</span>
-          <select
-            value={priority}
-            onChange={(e) => setPriority(e.target.value as TaskPriority)}
-            className="w-full rounded border border-ink/20 bg-white px-3 py-2 text-sm text-ink focus:border-focus focus:outline-none focus:ring-1 focus:ring-focus dark:border-paper/20 dark:bg-ink dark:text-paper"
-          >
-            {PRIORITIES.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <Input
-        placeholder="Category (optional)"
-        value={category}
-        onChange={(e) => setCategory(e.target.value)}
-      />
-      <Button type="submit" className="w-full" disabled={createTask.isPending}>
-        {createTask.isPending ? "Saving..." : "Add task"}
-      </Button>
-=======
       <h3 className="font-display text-xl">{isEditing ? "Edit task" : "New task"}</h3>
 
       <div>
@@ -319,7 +235,6 @@ export default function TaskForm({ task, onSuccess, onCancel }: TaskFormProps) {
           {mutation.isPending ? "Saving..." : "Save task"}
         </Button>
       </div>
->>>>>>> origin/develop
     </form>
   );
 }

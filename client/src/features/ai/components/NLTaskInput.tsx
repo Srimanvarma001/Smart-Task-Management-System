@@ -94,7 +94,7 @@ export default function NLTaskInput() {
             : "Use the AI input to draft a task, or fill in the fields below."}
         </p>
         {draft && (
-          <TaskForm initialValues={draft} onSaved={() => setModalOpen(false)} />
+          <TaskForm initialValues={draft} onSuccess={() => setModalOpen(false)} />
         )}
       </Modal>
     </>
