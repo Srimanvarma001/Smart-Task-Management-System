@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import Navbar from "../components/layout/Navbar";
 import Sidebar from "../components/layout/Sidebar";
+import { SidebarProvider } from "../components/layout/SidebarContext";
 import Modal from "../components/ui/Modal";
 import NLTaskInput from "../features/ai/components/NLTaskInput";
 import { useTasks } from "../features/tasks/hooks/useTasks";
@@ -50,46 +51,48 @@ export default function TasksPage() {
   const closeForm = () => setFormOpen(false);
 
   return (
-    <div className="min-h-screen">
-      <Navbar />
-      <div className="flex">
-        <Sidebar />
-        <main className="min-w-0 flex-1 space-y-6 p-4 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-2xl">Tasks</h2>
-            <button type="button" onClick={openCreate} className={newTaskButtonClass}>
-              New task
-            </button>
-          </div>
+    <SidebarProvider>
+      <div className="min-h-screen">
+        <Navbar />
+        <div className="flex">
+          <Sidebar />
+          <main className="min-w-0 flex-1 space-y-6 p-4 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-2xl">Tasks</h2>
+              <button type="button" onClick={openCreate} className={newTaskButtonClass}>
+                New task
+              </button>
+            </div>
 
-          <NLTaskInput />
+            <NLTaskInput />
 
-          <TaskFilters filters={filters} categories={categories} onChange={updateFilters} />
+            <TaskFilters filters={filters} categories={categories} onChange={updateFilters} />
 
-          <TaskList
-            tasks={data?.tasks ?? []}
-            total={data?.total ?? 0}
-            page={data?.page ?? 1}
-            totalPages={data?.totalPages ?? 1}
-            isLoading={isLoading}
-            error={error}
-            hasActiveFilters={hasActiveFilters}
-            onEdit={openEdit}
-            onPageChange={(page) => setFilters((prev) => ({ ...prev, page }))}
-            onRetry={() => void refetch()}
-            onClearFilters={clearFilters}
-          />
-
-          <Modal open={formOpen} onClose={closeForm}>
-            <TaskForm
-              key={editingTask?._id ?? "new"}
-              task={editingTask}
-              onSuccess={closeForm}
-              onCancel={closeForm}
+            <TaskList
+              tasks={data?.tasks ?? []}
+              total={data?.total ?? 0}
+              page={data?.page ?? 1}
+              totalPages={data?.totalPages ?? 1}
+              isLoading={isLoading}
+              error={error}
+              hasActiveFilters={hasActiveFilters}
+              onEdit={openEdit}
+              onPageChange={(page) => setFilters((prev) => ({ ...prev, page }))}
+              onRetry={() => void refetch()}
+              onClearFilters={clearFilters}
             />
-          </Modal>
-        </main>
+
+            <Modal open={formOpen} onClose={closeForm}>
+              <TaskForm
+                key={editingTask?._id ?? "new"}
+                task={editingTask}
+                onSuccess={closeForm}
+                onCancel={closeForm}
+              />
+            </Modal>
+          </main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }

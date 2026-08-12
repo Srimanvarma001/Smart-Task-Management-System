@@ -1,13 +1,14 @@
-import { useTheme } from "../../context/ThemeContext";
+import { useDarkMode } from "../../hooks/useDarkMode";
 
 export default function DarkModeToggle() {
-  const { theme, toggleTheme } = useTheme();
+  const { isDark, toggle } = useDarkMode();
   return (
     <button
-      onClick={toggleTheme}
+      type="button"
+      onClick={toggle}
       className="rounded border border-ink/10 px-3 py-1.5 font-mono text-xs text-ink hover:bg-ink/5 dark:border-paper/10 dark:text-paper dark:hover:bg-paper/10"
     >
-      {theme === "dark" ? "light" : "dark"}
+      {isDark ? "light" : "dark"}
     </button>
   );
 }

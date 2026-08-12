@@ -4,8 +4,29 @@ import type {
   Task,
   TaskFilters,
   TaskListResponse,
+  TaskPriority,
+  TaskStatus,
   UpdateTaskPayload,
 } from "../features/tasks/types";
+
+export interface RecentActivityItem {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  timestamp: string;
+}
+
+export interface UpcomingDeadlineItem {
+  id: string;
+  title: string;
+  dueDate: string;
+  priority: TaskPriority;
+}
+
+export interface CategoryBreakdownItem {
+  category: string;
+  count: number;
+}
 
 export interface TaskStats {
   total: number;
@@ -14,6 +35,10 @@ export interface TaskStats {
   overdue: number;
   byPriority: { high: number; medium: number; low: number };
   completionRate: number;
+  recentActivity: RecentActivityItem[];
+  upcomingDeadlines: UpcomingDeadlineItem[];
+  categoryBreakdown: CategoryBreakdownItem[];
+  weeklyTrend: { completedThisWeek: number };
 }
 
 export const taskApi = {

@@ -8,6 +8,7 @@ export function useCreateTask() {
     mutationFn: (payload: CreateTaskPayload) => taskApi.createTask(payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      void queryClient.invalidateQueries({ queryKey: ["tasks", "stats"] });
     },
   });
 }

@@ -82,7 +82,7 @@ export default function TaskList({
 
   return (
     <div className="space-y-4">
-      <ul className="space-y-2">
+      <ul className="space-y-1">
         {tasks.map((task) => (
           <TaskCard key={task._id} task={task} onEdit={onEdit} />
         ))}

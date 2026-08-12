@@ -12,6 +12,10 @@ const emptyStats: TaskStats = {
   overdue: 0,
   byPriority: { high: 0, medium: 0, low: 0 },
   completionRate: 0,
+  recentActivity: [],
+  upcomingDeadlines: [],
+  categoryBreakdown: [],
+  weeklyTrend: { completedThisWeek: 0 },
 };
 
 const cards = [
