@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
+import { useDarkMode } from "../hooks/useDarkMode";
 
 type Theme = "light" | "dark";
 
@@ -10,18 +11,12 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const stored = localStorage.getItem("theme");
-    return stored === "dark" ? "dark" : "light";
-  });
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    localStorage.setItem("theme", theme);
-  }, [theme]);
+  const { isDark, toggle } = useDarkMode();
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme: () => setTheme((t) => (t === "dark" ? "light" : "dark")) }}>
+    <ThemeContext.Provider
+      value={{ theme: isDark ? "dark" : "light", toggleTheme: toggle }}
+    >
       {children}
     </ThemeContext.Provider>
   );

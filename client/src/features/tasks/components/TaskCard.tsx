@@ -54,7 +54,7 @@ export default function TaskCard({ task, onEdit }: TaskCardProps) {
   return (
     <li className="list-none">
       <div
-        className={`flex items-start gap-3 rounded-sm border border-ink/10 border-l-4 bg-white p-4 motion-safe:transition-opacity dark:border-paper/10 dark:bg-ink ${
+        className={`flex items-start gap-3 rounded-sm border border-ink/10 border-l-4 bg-white px-3 py-2 motion-safe:transition-opacity dark:border-paper/10 dark:bg-ink ${
           priorityBorder[task.priority]
         } ${completed ? "opacity-60" : ""}`}
       >
@@ -77,7 +77,7 @@ export default function TaskCard({ task, onEdit }: TaskCardProps) {
           </button>
           {task.description && (
             <p
-              className={`mt-1 text-sm ${
+              className={`mt-0.5 text-sm ${
                 completed ? "text-ink/40 dark:text-paper/40" : "text-ink/70 dark:text-paper/70"
               }`}
             >
@@ -86,7 +86,7 @@ export default function TaskCard({ task, onEdit }: TaskCardProps) {
           )}
           {meta && (
             <p
-              className={`mt-1 font-mono text-xs ${
+              className={`mt-0.5 font-mono text-xs ${
                 completed ? "text-ink/40 dark:text-paper/40" : "text-ink/50 dark:text-paper/50"
               }`}
             >

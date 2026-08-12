@@ -1,5 +1,5 @@
 import { Types, type FilterQuery, type FlattenMaps, type SortOrder } from "mongoose";
-import { TaskModel, type ITask, type TaskPriority } from "../models/Task";
+import { TaskModel, type ITask, type TaskPriority, type TaskStatus } from "../models/Task";
 import { AppError } from "../utils/AppError";
 import type { CreateTaskInput, TaskQueryInput, UpdateTaskInput } from "../validators/task.schema";
 
@@ -20,6 +20,25 @@ export interface TaskListResult {
   totalPages: number;
 }
 
+export interface RecentActivityItem {
+  id: Types.ObjectId;
+  title: string;
+  status: TaskStatus;
+  timestamp: Date;
+}
+
+export interface UpcomingDeadlineItem {
+  id: Types.ObjectId;
+  title: string;
+  dueDate: Date;
+  priority: TaskPriority;
+}
+
+export interface CategoryBreakdownItem {
+  category: string;
+  count: number;
+}
+
 export interface TaskStatsResult {
   total: number;
   completed: number;
@@ -27,6 +46,10 @@ export interface TaskStatsResult {
   overdue: number;
   byPriority: Record<TaskPriority, number>;
   completionRate: number;
+  recentActivity: RecentActivityItem[];
+  upcomingDeadlines: UpcomingDeadlineItem[];
+  categoryBreakdown: CategoryBreakdownItem[];
+  weeklyTrend: { completedThisWeek: number };
 }
 
 export const taskService = {
@@ -113,17 +136,57 @@ export const taskService = {
   async getTaskStats(userId: string): Promise<TaskStatsResult> {
     const userFilter: FilterQuery<ITask> = { userId: new Types.ObjectId(userId) };
     const pendingFilter: FilterQuery<ITask> = { ...userFilter, status: "pending" };
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const [total, completed, pending, overdue, priorityCounts] = await Promise.all([
-      TaskModel.countDocuments(userFilter),
-      TaskModel.countDocuments({ ...userFilter, status: "completed" }),
-      TaskModel.countDocuments(pendingFilter),
-      TaskModel.countDocuments({ ...pendingFilter, dueDate: { $lt: new Date() } }),
-      TaskModel.aggregate<{ _id: TaskPriority; count: number }>([
-        { $match: userFilter },
-        { $group: { _id: "$priority", count: { $sum: 1 } } },
-      ]),
-    ]);
+    const [total, completed, pending, overdue, priorityCounts, recentActivity, upcomingDeadlines, categoryCounts, completedThisWeek] =
+      await Promise.all([
+        TaskModel.countDocuments(userFilter),
+        TaskModel.countDocuments({ ...userFilter, status: "completed" }),
+        TaskModel.countDocuments(pendingFilter),
+        TaskModel.countDocuments({ ...pendingFilter, dueDate: { $lt: now } }),
+        TaskModel.aggregate<{ _id: TaskPriority; count: number }>([
+          { $match: userFilter },
+          { $group: { _id: "$priority", count: { $sum: 1 } } },
+        ]),
+        TaskModel.aggregate<RecentActivityItem>([
+          { $match: userFilter },
+          {
+            $project: {
+              _id: 0,
+              id: "$_id",
+              title: 1,
+              status: 1,
+              timestamp: { $max: ["$createdAt", "$updatedAt"] },
+            },
+          },
+          { $sort: { timestamp: -1 } },
+          { $limit: 5 },
+        ]),
+        TaskModel.find({ ...userFilter, dueDate: { $gt: now } })
+          .sort({ dueDate: 1, _id: 1 })
+          .limit(5)
+          .select("title dueDate priority")
+          .lean()
+          .then((tasks) =>
+            tasks.map((task) => ({
+              id: task._id,
+              title: task.title,
+              dueDate: task.dueDate as Date,
+              priority: task.priority,
+            })),
+          ),
+        TaskModel.aggregate<{ _id: string | null; count: number }>([
+          { $match: userFilter },
+          { $group: { _id: "$category", count: { $sum: 1 } } },
+          { $sort: { count: -1, _id: 1 } },
+        ]),
+        TaskModel.countDocuments({
+          ...userFilter,
+          status: "completed",
+          updatedAt: { $gte: sevenDaysAgo },
+        }),
+      ]);
 
     const countFor = (priority: TaskPriority): number =>
       priorityCounts.find((entry) => entry._id === priority)?.count ?? 0;
@@ -139,6 +202,13 @@ export const taskService = {
         low: countFor("low"),
       },
       completionRate: total === 0 ? 0 : Math.round((completed / total) * 100),
+      recentActivity,
+      upcomingDeadlines,
+      categoryBreakdown: categoryCounts.map((entry) => ({
+        category: entry._id == null || entry._id === "" ? "Uncategorized" : entry._id,
+        count: entry.count,
+      })),
+      weeklyTrend: { completedThisWeek },
     };
   },
 };

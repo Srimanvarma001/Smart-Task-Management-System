@@ -464,6 +464,10 @@ describe("GET /api/tasks/stats", () => {
       overdue: 0,
       byPriority: { high: 0, medium: 0, low: 0 },
       completionRate: 0,
+      recentActivity: [],
+      upcomingDeadlines: [],
+      categoryBreakdown: [],
+      weeklyTrend: { completedThisWeek: 0 },
     });
   });
 
@@ -500,7 +504,41 @@ describe("GET /api/tasks/stats", () => {
       overdue: 1,
       byPriority: { high: 2, medium: 2, low: 2 },
       completionRate: 67,
+      upcomingDeadlines: [
+        {
+          id: pendingHigh._id,
+          title: "Pending high",
+          dueDate: "2030-01-01T00:00:00.000Z",
+          priority: "high",
+        },
+      ],
+      categoryBreakdown: [{ category: "Uncategorized", count: 6 }],
+      weeklyTrend: { completedThisWeek: 4 },
+      recentActivity: expect.any(Array),
     });
+
+    expect(res.body.data.recentActivity).toHaveLength(5);
+    expect(
+      res.body.data.recentActivity
+        .map((item: { title: string }) => item.title)
+        .sort(),
+    ).toEqual(["Done high", "Done low", "Done medium", "Done medium 2", "Overdue pending"]);
+    for (const item of res.body.data.recentActivity) {
+      expect(item).toEqual(
+        expect.objectContaining({
+          id: expect.any(String),
+          title: expect.any(String),
+          status: expect.stringMatching(/^(pending|completed)$/),
+          timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+        }),
+      );
+    }
+    expect(
+      res.body.data.recentActivity.every(
+        (item: { timestamp: string }, index: number, arr: Array<{ timestamp: string }>) =>
+          index === 0 || new Date(arr[index - 1].timestamp).getTime() >= new Date(item.timestamp).getTime(),
+      ),
+    ).toBe(true);
   });
 
   it("scopes stats to the authenticated user only", async () => {
@@ -516,7 +554,7 @@ describe("GET /api/tasks/stats", () => {
       .set("Authorization", `Bearer ${userA.token}`);
 
     expect(aRes.status).toBe(200);
-    expect(aRes.body.data).toEqual({
+    expect(aRes.body.data).toMatchObject({
       total: 6,
       completed: 4,
       pending: 2,
@@ -524,13 +562,26 @@ describe("GET /api/tasks/stats", () => {
       byPriority: { high: 2, medium: 2, low: 2 },
       completionRate: 67,
     });
+    expect(aRes.body.data.recentActivity).toHaveLength(5);
+    expect(aRes.body.data.recentActivity.every(
+      (item: { title: string }) =>
+        ["Done high", "Done low", "Done medium", "Done medium 2", "Overdue pending"].includes(item.title),
+    )).toBe(true);
+    expect(aRes.body.data.upcomingDeadlines).toHaveLength(1);
+    expect(aRes.body.data.upcomingDeadlines[0]).toMatchObject({
+      title: "Pending high",
+      dueDate: "2030-01-01T00:00:00.000Z",
+      priority: "high",
+    });
+    expect(aRes.body.data.categoryBreakdown).toEqual([{ category: "Uncategorized", count: 6 }]);
+    expect(aRes.body.data.weeklyTrend).toEqual({ completedThisWeek: 4 });
 
     const bRes = await request(app)
       .get("/api/tasks/stats")
       .set("Authorization", `Bearer ${userB.token}`);
 
     expect(bRes.status).toBe(200);
-    expect(bRes.body.data).toEqual({
+    expect(bRes.body.data).toMatchObject({
       total: 3,
       completed: 1,
       pending: 2,
@@ -538,6 +589,14 @@ describe("GET /api/tasks/stats", () => {
       byPriority: { high: 1, medium: 0, low: 2 },
       completionRate: 33,
     });
+    expect(
+      bRes.body.data.recentActivity
+        .map((item: { title: string }) => item.title)
+        .sort(),
+    ).toEqual(["B completed", "B overdue", "B pending"]);
+    expect(bRes.body.data.upcomingDeadlines).toEqual([]);
+    expect(bRes.body.data.categoryBreakdown).toEqual([{ category: "Uncategorized", count: 3 }]);
+    expect(bRes.body.data.weeklyTrend).toEqual({ completedThisWeek: 1 });
   });
 });
 

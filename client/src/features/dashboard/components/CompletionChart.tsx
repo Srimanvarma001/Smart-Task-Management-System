@@ -27,12 +27,12 @@ export default function CompletionChart({
   return (
     <div className="rounded-sm border border-ink/10 bg-white p-4 dark:border-paper/10 dark:bg-ink">
       <h3 className="font-display text-lg">Completion</h3>
-      <div className="mt-4 flex flex-wrap items-center gap-6">
+      <div className="mt-3 flex flex-wrap items-center gap-4">
         <svg
           viewBox="0 0 120 120"
           role="img"
           aria-label={`${rate}% of tasks completed`}
-          className="h-28 w-28 shrink-0"
+          className="h-24 w-24 shrink-0"
         >
           <title>{`${rate}% of tasks completed`}</title>
           <circle
@@ -66,7 +66,7 @@ export default function CompletionChart({
           </text>
         </svg>
 
-        <div className="min-w-0 flex-1 space-y-3">
+        <div className="min-w-0 flex-1 space-y-2">
           <div
             role="img"
             aria-label={`By priority: ${byPriority.high} high, ${byPriority.medium} medium, ${byPriority.low} low`}
