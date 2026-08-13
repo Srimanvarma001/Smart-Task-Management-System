@@ -1,6 +1,8 @@
+import { useCallback, useState } from "react";
 import Spinner from "../../../components/ui/Spinner";
+import { getHiddenTaskIds, hideTask, pruneHiddenTaskIds } from "../taskVisibility";
 import TaskCard from "./TaskCard";
-import type { Task } from "../types";
+import type { Task, TaskStatus } from "../types";
 
 interface TaskListProps {
   tasks: Task[];
@@ -10,6 +12,7 @@ interface TaskListProps {
   isLoading: boolean;
   error: Error | null;
   hasActiveFilters: boolean;
+  statusFilter?: TaskStatus;
   onEdit: (task: Task) => void;
   onPageChange: (page: number) => void;
   onRetry: () => void;
@@ -27,11 +30,26 @@ export default function TaskList({
   isLoading,
   error,
   hasActiveFilters,
+  statusFilter,
   onEdit,
   onPageChange,
   onRetry,
   onClearFilters,
 }: TaskListProps) {
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => getHiddenTaskIds());
+
+  const handleFadeComplete = useCallback((taskId: string) => {
+    hideTask(taskId);
+    setHiddenIds(new Set(getHiddenTaskIds()));
+  }, []);
+
+  const viewCompletedOnly = statusFilter === "completed";
+  if (pruneHiddenTaskIds(tasks)) {
+    setHiddenIds(new Set(getHiddenTaskIds()));
+  }
+  const visibleTasks = viewCompletedOnly
+    ? tasks
+    : tasks.filter((task) => !hiddenIds.has(task._id));
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
@@ -83,8 +101,14 @@ export default function TaskList({
   return (
     <div className="space-y-4">
       <ul className="space-y-1">
-        {tasks.map((task) => (
-          <TaskCard key={task._id} task={task} onEdit={onEdit} />
+        {visibleTasks.map((task) => (
+          <TaskCard
+            key={task._id}
+            task={task}
+            onEdit={onEdit}
+            fadeWhenCompleted={!viewCompletedOnly}
+            onFadeComplete={handleFadeComplete}
+          />
         ))}
       </ul>
 

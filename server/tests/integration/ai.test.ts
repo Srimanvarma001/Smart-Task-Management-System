@@ -236,3 +236,67 @@ describe("authentication guard on AI routes", () => {
     expect(mockedCallDeepSeek).not.toHaveBeenCalled();
   });
 });
+
+describe("inferTags", () => {
+  it("returns trimmed, lowercased, deduped tags from a mocked DeepSeek response", async () => {
+    const { inferTags } = await import("../../src/services/ai.service");
+    mockedCallDeepSeek.mockResolvedValue(
+      JSON.stringify(["Work", "  urgent-followup ", "shopping", "work"]),
+    );
+
+    const tags = await inferTags("Buy groceries for dinner");
+
+    expect(tags).toEqual(["work", "urgent-followup", "shopping"]);
+    expect(mockedCallDeepSeek).toHaveBeenCalledTimes(1);
+    const [messages] = mockedCallDeepSeek.mock.calls[0];
+    expect(messages[0].role).toBe("system");
+    expect(messages[1]).toEqual({ role: "user", content: "Title: Buy groceries for dinner" });
+  });
+
+  it("returns [] when the response is not valid JSON", async () => {
+    const { inferTags } = await import("../../src/services/ai.service");
+    mockedCallDeepSeek.mockResolvedValue("this is not a json array");
+
+    const tags = await inferTags("Buy groceries");
+
+    expect(tags).toEqual([]);
+  });
+
+  it("returns [] when the response is not an array of strings", async () => {
+    const { inferTags } = await import("../../src/services/ai.service");
+    mockedCallDeepSeek.mockResolvedValue(JSON.stringify({ tags: ["work"] }));
+
+    const tags = await inferTags("Buy groceries");
+
+    expect(tags).toEqual([]);
+  });
+
+  it("returns [] when the array is empty", async () => {
+    const { inferTags } = await import("../../src/services/ai.service");
+    mockedCallDeepSeek.mockResolvedValue(JSON.stringify([]));
+
+    const tags = await inferTags("Buy groceries");
+
+    expect(tags).toEqual([]);
+  });
+
+  it("caps the result at 5 tags", async () => {
+    const { inferTags } = await import("../../src/services/ai.service");
+    mockedCallDeepSeek.mockResolvedValue(
+      JSON.stringify(["a", "b", "c", "d", "e", "f", "g"]),
+    );
+
+    const tags = await inferTags("Buy groceries");
+
+    expect(tags).toEqual(["a", "b", "c", "d", "e"]);
+  });
+
+  it("returns [] gracefully when the AI call fails", async () => {
+    const { inferTags } = await import("../../src/services/ai.service");
+    mockedCallDeepSeek.mockRejectedValue(new AppError(502, "AI service unavailable: network down"));
+
+    const tags = await inferTags("Buy groceries");
+
+    expect(tags).toEqual([]);
+  });
+});

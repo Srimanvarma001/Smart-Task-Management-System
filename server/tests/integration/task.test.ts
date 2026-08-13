@@ -1,11 +1,46 @@
 import request from "supertest";
 import { Types } from "mongoose";
+import jwt from "jsonwebtoken";
 import app from "../../src/app";
+import { config } from "../../src/config/env";
+import { callDeepSeek } from "../../src/config/deepseek";
+import * as aiService from "../../src/services/ai.service";
+import { TaskModel } from "../../src/models/Task";
+import { UserModel } from "../../src/models/User";
 import { connectTestDB, disconnectTestDB } from "./setup";
+
+jest.mock("../../src/config/deepseek", () => ({
+  callDeepSeek: jest.fn(),
+  DEEPSEEK_API_URL: "https://api.deepseek.com/chat/completions",
+  DEEPSEEK_MODEL: "deepseek-v4-flash",
+  DEEPSEEK_MAX_TOKENS: 500,
+  DEEPSEEK_TIMEOUT_MS: 15_000,
+}));
+
+const mockedCallDeepSeek = callDeepSeek as jest.MockedFunction<typeof callDeepSeek>;
 
 beforeAll(connectTestDB);
 
 afterAll(disconnectTestDB);
+
+beforeEach(() => {
+  mockedCallDeepSeek.mockReset();
+  mockedCallDeepSeek.mockImplementation((messages) => {
+    const system = typeof messages[0].content === "string" ? messages[0].content : "";
+    const last = messages[messages.length - 1];
+    const content = typeof last.content === "string" ? last.content.toLowerCase() : "";
+    if (system.includes("prioritization")) {
+      if (content.includes("high")) return Promise.resolve("High");
+      if (content.includes("low")) return Promise.resolve("Low");
+      return Promise.resolve("Medium");
+    }
+    return Promise.resolve(JSON.stringify(["work", "urgent-followup"]));
+  });
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 const PASSWORD = "password123";
 const NONEXISTENT_ID = new Types.ObjectId().toString();
@@ -83,9 +118,9 @@ describe("POST /api/tasks", () => {
       title: "Finish report",
       description: "Quarterly report",
       status: "pending",
-      priority: "high",
+      priority: "medium",
       category: "work",
-      tags: ["report", "finance"],
+      tags: ["work", "urgent-followup"],
       aiGenerated: false,
       userId: user.id,
     });
@@ -99,6 +134,125 @@ describe("POST /api/tasks", () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("Validation failed");
+  });
+
+  it("infers a valid priority server-side when the client sends none", async () => {
+    mockedCallDeepSeek.mockImplementationOnce(() => Promise.resolve("High"));
+
+    const res = await request(app)
+      .post("/api/tasks")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({ title: "Urgent deadline", description: "Ship the release before noon" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({ title: "Urgent deadline", priority: "high" });
+  });
+
+  it("still creates the task with Medium priority when the AI call fails", async () => {
+    mockedCallDeepSeek.mockRejectedValueOnce(new Error("AI service unavailable: timeout"));
+
+    const res = await request(app)
+      .post("/api/tasks")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({ title: "Survives AI failure" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({ title: "Survives AI failure", priority: "medium" });
+  });
+
+  it("reuses the AI-parsed priority on create without a second inference call", async () => {
+    const inferPrioritySpy = jest.spyOn(aiService, "inferPriority");
+
+    const res = await request(app)
+      .post("/api/tasks")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({ title: "Buy groceries", priority: "low", aiGenerated: true });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({ title: "Buy groceries", priority: "low", aiGenerated: true });
+    expect(inferPrioritySpy).not.toHaveBeenCalled();
+  });
+
+  it("re-infers priority server-side for a manual create even if a priority is sent", async () => {
+    const inferPrioritySpy = jest.spyOn(aiService, "inferPriority");
+
+    const res = await request(app)
+      .post("/api/tasks")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({ title: "Manual entry task", priority: "high" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({ title: "Manual entry task", priority: "medium" });
+    expect(inferPrioritySpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to server inference when the AI-parse priority is missing", async () => {
+    const inferPrioritySpy = jest.spyOn(aiService, "inferPriority");
+
+    const res = await request(app)
+      .post("/api/tasks")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({ title: "High urgency cleanup", aiGenerated: true });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({ title: "High urgency cleanup", priority: "high" });
+    expect(inferPrioritySpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to server inference when the AI-parse priority is invalid", async () => {
+    const inferPrioritySpy = jest.spyOn(aiService, "inferPriority");
+
+    const res = await request(app)
+      .post("/api/tasks")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({ title: "Ambiguous errand", priority: "sometime", aiGenerated: true });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({ title: "Ambiguous errand", priority: "medium" });
+    expect(inferPrioritySpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses server-inferred tags for a manual create, ignoring client-sent tags", async () => {
+    const res = await request(app)
+      .post("/api/tasks")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({ title: "Buy groceries", tags: ["client-supplied"] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({
+      title: "Buy groceries",
+      tags: ["work", "urgent-followup"],
+    });
+  });
+
+  it("infers tags server-side for an AI-parsed create, ignoring client-sent tags", async () => {
+    const res = await request(app)
+      .post("/api/tasks")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({ title: "Buy groceries", priority: "low", aiGenerated: true, tags: ["client-supplied"] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({
+      title: "Buy groceries",
+      priority: "low",
+      aiGenerated: true,
+      tags: ["work", "urgent-followup"],
+    });
+  });
+
+  it("still creates the task with empty tags when tag inference fails", async () => {
+    mockedCallDeepSeek.mockImplementationOnce(() => Promise.resolve("High"));
+    mockedCallDeepSeek.mockImplementationOnce(() =>
+      Promise.reject(new Error("AI service unavailable: timeout")),
+    );
+
+    const res = await request(app)
+      .post("/api/tasks")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({ title: "No tags today" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({ title: "No tags today", tags: [] });
   });
 });
 
@@ -219,6 +373,108 @@ describe("GET /api/tasks", () => {
       expect(res.status).toBe(200);
       expect(res.body.data.total).toBe(0);
       expect(res.body.data.tasks).toHaveLength(0);
+    });
+  });
+
+  describe("date range", () => {
+    let user: TestUser;
+    let otherId: string;
+
+    beforeAll(async () => {
+      const dbUser = await UserModel.create({
+        name: "daterange-owner",
+        email: `daterange-owner-${Date.now()}@task-test.com`,
+        passwordHash: "not-used",
+      });
+      user = {
+        id: dbUser.id,
+        token: jwt.sign({ id: dbUser.id }, config.jwtSecret),
+      };
+
+      const otherUser = await UserModel.create({
+        name: "daterange-other",
+        email: `daterange-other-${Date.now()}@task-test.com`,
+        passwordHash: "not-used",
+      });
+      otherId = otherUser.id;
+
+      await createTask(user.token, "July task 1", { dueDate: "2026-07-05" });
+      await createTask(user.token, "July task 2", { dueDate: "2026-07-20" });
+      await createTask(user.token, "August task", { dueDate: "2026-08-10" });
+      await createTask(user.token, "No due date");
+      await TaskModel.create({
+        userId: otherUser._id,
+        title: "Other July task",
+        dueDate: new Date("2026-07-15"),
+        priority: "medium",
+        status: "pending",
+        tags: [],
+      });
+    });
+
+    it("returns only tasks whose dueDate falls within the range", async () => {
+      const res = await request(app)
+        .get("/api/tasks")
+        .query({ dueDateFrom: "2026-07-01", dueDateTo: "2026-07-31" })
+        .set("Authorization", `Bearer ${user.token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.total).toBe(2);
+      expect(
+        res.body.data.tasks
+          .map((task: TaskFixture) => task.title)
+          .sort(),
+      ).toEqual(["July task 1", "July task 2"]);
+    });
+
+    it("returns an empty array when no tasks fall within the range", async () => {
+      const res = await request(app)
+        .get("/api/tasks")
+        .query({ dueDateFrom: "2027-01-01", dueDateTo: "2027-01-31" })
+        .set("Authorization", `Bearer ${user.token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.total).toBe(0);
+      expect(res.body.data.tasks).toEqual([]);
+    });
+
+    it("does not leak other users' tasks in the same date range", async () => {
+      const res = await request(app)
+        .get("/api/tasks")
+        .query({ dueDateFrom: "2026-07-01", dueDateTo: "2026-07-31" })
+        .set("Authorization", `Bearer ${user.token}`);
+
+      expect(res.status).toBe(200);
+      expect(
+        res.body.data.tasks
+          .map((task: TaskFixture) => task.title)
+          .sort(),
+      ).toEqual(["July task 1", "July task 2"]);
+      expect(res.body.data.tasks.every((task: TaskFixture) => task.userId === user.id)).toBe(true);
+      expect(res.body.data.tasks.some((task: TaskFixture) => task.userId === otherId)).toBe(false);
+    });
+
+    it("returns every match in one response when a date range is active", async () => {
+      await TaskModel.insertMany(
+        Array.from({ length: 12 }, (_, i) => ({
+          userId: new Types.ObjectId(user.id),
+          title: `September task ${i + 1}`,
+          dueDate: new Date("2026-09-15"),
+          priority: "medium" as const,
+          status: "pending" as const,
+          tags: [],
+        })),
+      );
+
+      const res = await request(app)
+        .get("/api/tasks")
+        .query({ dueDateFrom: "2026-09-01", dueDateTo: "2026-09-30" })
+        .set("Authorization", `Bearer ${user.token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.total).toBe(12);
+      expect(res.body.data.tasks).toHaveLength(12);
+      expect(res.body.data.tasks.every((task: TaskFixture) => task.userId === user.id)).toBe(true);
     });
   });
 
@@ -502,7 +758,7 @@ describe("GET /api/tasks/stats", () => {
       completed: 4,
       pending: 2,
       overdue: 1,
-      byPriority: { high: 2, medium: 2, low: 2 },
+      byPriority: { high: 2, medium: 3, low: 1 },
       completionRate: 67,
       upcomingDeadlines: [
         {
@@ -559,7 +815,7 @@ describe("GET /api/tasks/stats", () => {
       completed: 4,
       pending: 2,
       overdue: 1,
-      byPriority: { high: 2, medium: 2, low: 2 },
+      byPriority: { high: 2, medium: 3, low: 1 },
       completionRate: 67,
     });
     expect(aRes.body.data.recentActivity).toHaveLength(5);
@@ -586,7 +842,7 @@ describe("GET /api/tasks/stats", () => {
       completed: 1,
       pending: 2,
       overdue: 1,
-      byPriority: { high: 1, medium: 0, low: 2 },
+      byPriority: { high: 0, medium: 3, low: 0 },
       completionRate: 33,
     });
     expect(

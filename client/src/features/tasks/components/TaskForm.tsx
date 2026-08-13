@@ -85,18 +85,24 @@ export default function TaskForm({ task, initialValues, onSuccess, onCancel }: T
       return;
     }
 
+    const isAiParseCreate = !isEditing && Boolean(initialValues?.aiGenerated);
+
     const payload = {
       title: form.title.trim(),
       description: form.description.trim() || undefined,
       dueDate: form.dueDate || undefined,
-      priority: form.priority,
+      ...(isEditing || isAiParseCreate ? { priority: form.priority } : {}),
       category: form.category.trim() || undefined,
-      tags: form.tags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean),
+      ...(isEditing
+        ? {
+            tags: form.tags
+              .split(",")
+              .map((tag) => tag.trim())
+              .filter(Boolean),
+          }
+        : {}),
       // only relevant on create: marks a task that originated from AI parsing
-      ...(isEditing ? {} : { aiGenerated: Boolean(initialValues?.aiGenerated) }),
+      ...(isEditing ? {} : { aiGenerated: isAiParseCreate }),
     };
 
     try {
@@ -167,21 +173,23 @@ export default function TaskForm({ task, initialValues, onSuccess, onCancel }: T
           )}
         </div>
 
-        <div>
-          <label htmlFor="task-priority" className="mb-1 block text-sm font-medium">
-            Priority
-          </label>
-          <select
-            id="task-priority"
-            value={form.priority}
-            onChange={(e) => setField("priority", e.target.value as TaskPriority)}
-            className={inputClass}
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </div>
+        {isEditing && (
+          <div>
+            <label htmlFor="task-priority" className="mb-1 block text-sm font-medium">
+              Priority
+            </label>
+            <select
+              id="task-priority"
+              value={form.priority}
+              onChange={(e) => setField("priority", e.target.value as TaskPriority)}
+              className={inputClass}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -197,17 +205,19 @@ export default function TaskForm({ task, initialValues, onSuccess, onCancel }: T
           />
         </div>
 
-        <div>
-          <label htmlFor="task-tags" className="mb-1 block text-sm font-medium">
-            Tags
-          </label>
-          <Input
-            id="task-tags"
-            value={form.tags}
-            onChange={(e) => setField("tags", e.target.value)}
-            placeholder="Comma-separated"
-          />
-        </div>
+        {isEditing && (
+          <div>
+            <label htmlFor="task-tags" className="mb-1 block text-sm font-medium">
+              Tags
+            </label>
+            <Input
+              id="task-tags"
+              value={form.tags}
+              onChange={(e) => setField("tags", e.target.value)}
+              placeholder="Comma-separated"
+            />
+          </div>
+        )}
       </div>
 
       {errors.form && (

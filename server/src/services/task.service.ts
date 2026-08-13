@@ -1,6 +1,7 @@
 import { Types, type FilterQuery, type FlattenMaps, type SortOrder } from "mongoose";
 import { TaskModel, type ITask, type TaskPriority, type TaskStatus } from "../models/Task";
 import { AppError } from "../utils/AppError";
+import { inferPriority, inferTags } from "./ai.service";
 import type { CreateTaskInput, TaskQueryInput, UpdateTaskInput } from "../validators/task.schema";
 
 function escapeRegex(value: string): string {
@@ -11,6 +12,13 @@ function assertValidTaskId(taskId: string): void {
   if (!Types.ObjectId.isValid(taskId)) {
     throw new AppError(404, "Task not found");
   }
+}
+
+function normalizePriority(value: unknown): TaskPriority | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized !== "high" && normalized !== "medium" && normalized !== "low") return undefined;
+  return normalized;
 }
 
 export interface TaskListResult {
@@ -69,23 +77,46 @@ export const taskService = {
       query.title = { $regex: escapeRegex(filters.search), $options: "i" };
     }
 
+    const hasDateRange = Boolean(filters.dueDateFrom && filters.dueDateTo);
+    if (hasDateRange) {
+      query.dueDate = {
+        $gte: new Date(filters.dueDateFrom as string),
+        $lte: new Date(filters.dueDateTo as string),
+      };
+    }
+
     const direction: SortOrder = filters.order === "asc" ? 1 : -1;
     const sort: Record<string, SortOrder> = { [filters.sort]: direction, _id: direction };
 
-    const page = filters.page;
-    const limit = filters.limit;
-    const skip = (page - 1) * limit;
+    const page = hasDateRange ? 1 : filters.page;
+    const limit = hasDateRange ? undefined : filters.limit;
+    const skip = hasDateRange ? 0 : (page - 1) * (limit as number);
 
+    const findQuery = TaskModel.find(query).sort(sort).skip(skip);
     const [tasks, total] = await Promise.all([
-      TaskModel.find(query).sort(sort).skip(skip).limit(limit).lean(),
+      (hasDateRange ? findQuery : findQuery.limit(limit as number)).lean(),
       TaskModel.countDocuments(query),
     ]);
 
-    return { tasks, total, page, totalPages: Math.ceil(total / limit) };
+    return { tasks, total, page, totalPages: hasDateRange ? 1 : Math.ceil(total / (limit as number)) };
   },
 
   async createTask(userId: string, data: CreateTaskInput) {
-    return TaskModel.create({ ...data, userId: new Types.ObjectId(userId) });
+    const aiPriority =
+      data.aiGenerated === true ? normalizePriority(data.priority) : undefined;
+    const priority =
+      aiPriority ?? ((await inferPriority(data.title, data.description)).toLowerCase() as TaskPriority);
+    const tags = await inferTags(data.title, data.description);
+    return TaskModel.create({
+      title: data.title,
+      description: data.description,
+      dueDate: data.dueDate,
+      category: data.category,
+      tags,
+      priority,
+      aiGenerated: data.aiGenerated ?? false,
+      userId: new Types.ObjectId(userId),
+    });
   },
 
   async getTaskById(userId: string, taskId: string) {

@@ -23,6 +23,8 @@ export interface TaskFilters {
   priority?: TaskPriority;
   category?: string;
   search?: string;
+  dueDateFrom?: string;
+  dueDateTo?: string;
   sort?: TaskSort;
   order?: SortOrder;
   page?: number;
@@ -39,9 +41,10 @@ export interface CreateTaskPayload {
   title: string;
   description?: string;
   dueDate?: string;
-  priority: TaskPriority;
+  priority?: TaskPriority;
+  aiGenerated?: boolean;
   category?: string;
-  tags: string[];
+  tags?: string[];
 }
 
 export type UpdateTaskPayload = Partial<CreateTaskPayload>;
