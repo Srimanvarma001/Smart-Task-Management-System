@@ -6,6 +6,10 @@ import { AppError } from "../utils/AppError";
 const PRIORITIES = ["low", "medium", "high"] as const;
 type Priority = (typeof PRIORITIES)[number];
 
+type InferredPriority = "High" | "Medium" | "Low";
+
+const INFERRED_PRIORITIES: InferredPriority[] = ["High", "Medium", "Low"];
+
 export interface ParsedTask {
   title: string;
   dueDate?: string;
@@ -80,6 +84,70 @@ function normalizeDueDate(value: unknown): string | undefined {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) throw new AppError(502, "AI returned an invalid dueDate");
   return date.toISOString();
+}
+
+export async function inferTags(title: string, description?: string): Promise<string[]> {
+  const userContent =
+    typeof description === "string" && description.trim().length > 0
+      ? `Title: ${title}\nDescription: ${description}`
+      : `Title: ${title}`;
+
+  try {
+    const raw = await callDeepSeek(
+      [
+        {
+          role: "system",
+          content:
+            'You are a task tagging assistant. Given a task title (and optional description), return 2-4 short, lowercase, single-or-two-word tags relevant to the task\'s topic or context (e.g. "work", "personal", "urgent-followup", "shopping"). Respond with ONLY a JSON array of strings, nothing else. No prose, no markdown fences.',
+        },
+        { role: "user", content: userContent },
+      ],
+      { maxTokens: 50 },
+    );
+
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    const seen = new Set<string>();
+    const tags: string[] = [];
+    for (const item of parsed) {
+      if (typeof item !== "string" || item.trim().length === 0) continue;
+      const normalized = item.trim().toLowerCase();
+      if (seen.has(normalized)) continue;
+      seen.add(normalized);
+      tags.push(normalized);
+      if (tags.length >= 5) break;
+    }
+    return tags;
+  } catch {
+    return [];
+  }
+}
+
+export async function inferPriority(title: string, description?: string): Promise<InferredPriority> {
+  const userContent =
+    typeof description === "string" && description.trim().length > 0
+      ? `Title: ${title}\nDescription: ${description}`
+      : `Title: ${title}`;
+
+  try {
+    const raw = await callDeepSeek(
+      [
+        {
+          role: "system",
+          content:
+            "You are a task prioritization assistant. Given a task title (and optional description), classify the task's priority based on the urgency and importance implied by the wording. Return ONLY one word: High, Medium, or Low. No JSON, no explanation, no punctuation.",
+        },
+        { role: "user", content: userContent },
+      ],
+      { maxTokens: 10 },
+    );
+
+    const normalized = raw.trim().toLowerCase();
+    return INFERRED_PRIORITIES.find((priority) => priority.toLowerCase() === normalized) ?? "Medium";
+  } catch {
+    return "Medium";
+  }
 }
 
 export const aiService = {

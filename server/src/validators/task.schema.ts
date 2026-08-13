@@ -11,9 +11,9 @@ export const createTaskSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   dueDate: isoDateString.optional(),
-  priority: z.enum(["low", "medium", "high"]).default("medium"),
+  priority: z.string().optional(),
+  aiGenerated: z.boolean().optional(),
   category: z.string().optional(),
-  tags: z.array(z.string()).optional().default([]),
 });
 
 export const updateTaskSchema = z.object({
@@ -30,6 +30,8 @@ export const querySchema = z.object({
   priority: z.enum(["low", "medium", "high"]).optional(),
   category: z.string().optional(),
   search: z.string().optional(),
+  dueDateFrom: isoDateString.optional(),
+  dueDateTo: isoDateString.optional(),
   sort: z.enum(["createdAt", "dueDate", "priority"]).default("createdAt"),
   order: z.enum(["asc", "desc"]).default("desc"),
   page: z.coerce.number().int().min(1).default(1),

@@ -9,9 +9,9 @@ export default {
         ink: "#1B1D22",
         paper: "#F5F6F3",
         focus: "#33449E",
-        priorityHigh: "#C1432E",
-        priorityMedium: "#C98A2C",
-        priorityLow: "#3E7C74",
+        priorityHigh: "#991B1B",
+        priorityMedium: "#C2410C",
+        priorityLow: "#0F766E",
       },
       fontFamily: {
         display: ["Fraunces", "Georgia", "serif"],
