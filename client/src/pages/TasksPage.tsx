@@ -66,7 +66,13 @@ export default function TasksPage() {
 
             <NLTaskInput />
 
-            <TaskFilters filters={filters} categories={categories} onChange={updateFilters} />
+            <TaskFilters
+              filters={filters}
+              categories={categories}
+              hasActiveFilters={hasActiveFilters}
+              onChange={updateFilters}
+              onClearFilters={clearFilters}
+            />
 
             <TaskList
               tasks={data?.tasks ?? []}

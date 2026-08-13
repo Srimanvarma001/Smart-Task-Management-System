@@ -74,7 +74,8 @@ export const taskService = {
       query.category = filters.category;
     }
     if (filters.search) {
-      query.title = { $regex: escapeRegex(filters.search), $options: "i" };
+      const regex = { $regex: escapeRegex(filters.search), $options: "i" };
+      query.$or = [{ title: regex }, { description: regex }];
     }
 
     const hasDateRange = Boolean(filters.dueDateFrom && filters.dueDateTo);
