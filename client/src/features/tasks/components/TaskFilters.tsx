@@ -4,7 +4,9 @@ import type { TaskFilters, TaskPriority, TaskStatus } from "../types";
 interface TaskFiltersProps {
   filters: TaskFilters;
   categories: string[];
+  hasActiveFilters: boolean;
   onChange: (filters: TaskFilters) => void;
+  onClearFilters: () => void;
 }
 
 const selectClass =
@@ -21,7 +23,13 @@ const priorityValues: Array<{ value: TaskPriority; label: string }> = [
   { value: "high", label: "High" },
 ];
 
-export default function TaskFilters({ filters, categories, onChange }: TaskFiltersProps) {
+export default function TaskFilters({
+  filters,
+  categories,
+  hasActiveFilters,
+  onChange,
+  onClearFilters,
+}: TaskFiltersProps) {
   const [search, setSearch] = useState(filters.search ?? "");
   const [lastExternalSearch, setLastExternalSearch] = useState(filters.search);
   if (lastExternalSearch !== filters.search) {
@@ -116,6 +124,16 @@ export default function TaskFilters({ filters, categories, onChange }: TaskFilte
           ))}
         </select>
       </div>
+
+      {hasActiveFilters && (
+        <button
+          type="button"
+          onClick={onClearFilters}
+          className="rounded border border-ink/20 px-3 py-2 text-sm text-ink hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus dark:border-paper/20 dark:text-paper dark:hover:bg-paper/10"
+        >
+          Clear filters
+        </button>
+      )}
     </div>
   );
 }

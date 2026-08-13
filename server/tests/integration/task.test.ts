@@ -341,6 +341,56 @@ describe("GET /api/tasks", () => {
       expect(res.body.data.total).toBe(1);
       expect(res.body.data.tasks[0].title).toBe("Pending high");
     });
+
+    it("applies search + status + priority as AND, not OR", async () => {
+      const pendingHigh = await request(app)
+        .get("/api/tasks")
+        .query({ search: "pending", status: "pending", priority: "high" })
+        .set("Authorization", `Bearer ${user.token}`);
+      expect(pendingHigh.status).toBe(200);
+      expect(pendingHigh.body.data.total).toBe(1);
+      expect(pendingHigh.body.data.tasks[0].title).toBe("Pending high");
+
+      const pendingLow = await request(app)
+        .get("/api/tasks")
+        .query({ search: "pending", status: "pending", priority: "low" })
+        .set("Authorization", `Bearer ${user.token}`);
+      expect(pendingLow.status).toBe(200);
+      expect(pendingLow.body.data.total).toBe(1);
+      expect(pendingLow.body.data.tasks[0].title).toBe("Pending low");
+
+      const searchMatchesBothStatuses = await request(app)
+        .get("/api/tasks")
+        .query({ search: "pending" })
+        .set("Authorization", `Bearer ${user.token}`);
+      expect(searchMatchesBothStatuses.body.data.total).toBe(2);
+
+      const completed = await request(app)
+        .get("/api/tasks")
+        .query({ search: "pending", status: "completed" })
+        .set("Authorization", `Bearer ${user.token}`);
+      expect(completed.status).toBe(200);
+      expect(completed.body.data.total).toBe(0);
+
+      const completedMedium = await request(app)
+        .get("/api/tasks")
+        .query({ search: "medium", status: "completed", priority: "medium" })
+        .set("Authorization", `Bearer ${user.token}`);
+      expect(completedMedium.status).toBe(200);
+      expect(completedMedium.body.data.total).toBe(1);
+      expect(completedMedium.body.data.tasks[0].title).toBe("Completed medium");
+    });
+
+    it("returns an empty array when no task matches the combined filters", async () => {
+      const res = await request(app)
+        .get("/api/tasks")
+        .query({ search: "pending", status: "completed", priority: "high" })
+        .set("Authorization", `Bearer ${user.token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.total).toBe(0);
+      expect(res.body.data.tasks).toEqual([]);
+    });
   });
 
   describe("search", () => {
@@ -351,6 +401,9 @@ describe("GET /api/tasks", () => {
       await createTask(user.token, "Buy groceries");
       await createTask(user.token, "Walk the dog");
       await createTask(user.token, "Read a book");
+      await createTask(user.token, "Prepare slides", {
+        description: "Review the quarterly report before Friday",
+      });
     });
 
     it("matches the title with a substring search", async () => {
@@ -362,6 +415,28 @@ describe("GET /api/tasks", () => {
       expect(res.status).toBe(200);
       expect(res.body.data.total).toBe(1);
       expect(res.body.data.tasks[0].title).toBe("Walk the dog");
+    });
+
+    it("matches the title case-insensitively", async () => {
+      const res = await request(app)
+        .get("/api/tasks")
+        .query({ search: "WALK" })
+        .set("Authorization", `Bearer ${user.token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.total).toBe(1);
+      expect(res.body.data.tasks[0].title).toBe("Walk the dog");
+    });
+
+    it("matches the description with a substring search", async () => {
+      const res = await request(app)
+        .get("/api/tasks")
+        .query({ search: "quarterly" })
+        .set("Authorization", `Bearer ${user.token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.total).toBe(1);
+      expect(res.body.data.tasks[0].title).toBe("Prepare slides");
     });
 
     it("returns nothing when no title matches", async () => {
@@ -476,6 +551,43 @@ describe("GET /api/tasks", () => {
       expect(res.body.data.tasks).toHaveLength(12);
       expect(res.body.data.tasks.every((task: TaskFixture) => task.userId === user.id)).toBe(true);
     });
+
+    it("applies a date range together with search and status filters", async () => {
+      const julyMatch = await request(app)
+        .get("/api/tasks")
+        .query({ search: "july", dueDateFrom: "2026-07-01", dueDateTo: "2026-07-31" })
+        .set("Authorization", `Bearer ${user.token}`);
+
+      expect(julyMatch.status).toBe(200);
+      expect(julyMatch.body.data.total).toBe(2);
+      expect(
+        julyMatch.body.data.tasks
+          .map((task: TaskFixture) => task.title)
+          .sort(),
+      ).toEqual(["July task 1", "July task 2"]);
+
+      const augustExcluded = await request(app)
+        .get("/api/tasks")
+        .query({ search: "august", dueDateFrom: "2026-07-01", dueDateTo: "2026-07-31" })
+        .set("Authorization", `Bearer ${user.token}`);
+      expect(augustExcluded.status).toBe(200);
+      expect(augustExcluded.body.data.total).toBe(0);
+
+      const julyTask2 = julyMatch.body.data.tasks.find(
+        (task: TaskFixture) => task.title === "July task 2",
+      ) as TaskFixture;
+      await request(app)
+        .patch(`/api/tasks/${julyTask2._id}/status`)
+        .set("Authorization", `Bearer ${user.token}`);
+
+      const completedInRange = await request(app)
+        .get("/api/tasks")
+        .query({ search: "july", status: "completed", dueDateFrom: "2026-07-01", dueDateTo: "2026-07-31" })
+        .set("Authorization", `Bearer ${user.token}`);
+      expect(completedInRange.status).toBe(200);
+      expect(completedInRange.body.data.total).toBe(1);
+      expect(completedInRange.body.data.tasks[0].title).toBe("July task 2");
+    });
   });
 
   describe("pagination", () => {
@@ -525,6 +637,20 @@ describe("GET /api/tasks", () => {
       expect(page3.status).toBe(200);
       expect(page3.body.data).toMatchObject({ total: 5, page: 3, totalPages: 3 });
       expect(page3.body.data.tasks).toHaveLength(1);
+    });
+
+    it("paginates with filters applied", async () => {
+      const page2 = await request(app)
+        .get("/api/tasks")
+        .query({ search: "page task", page: 2, limit: 2 })
+        .set("Authorization", `Bearer ${user.token}`);
+
+      expect(page2.status).toBe(200);
+      expect(page2.body.data).toMatchObject({ total: 5, page: 2, totalPages: 3 });
+      expect(page2.body.data.tasks).toHaveLength(2);
+      expect(
+        page2.body.data.tasks.every((task: TaskFixture) => task.title.includes("Page task")),
+      ).toBe(true);
     });
   });
 });
