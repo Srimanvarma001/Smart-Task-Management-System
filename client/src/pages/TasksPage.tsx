@@ -69,7 +69,6 @@ export default function TasksPage() {
             <TaskFilters
               filters={filters}
               categories={categories}
-              hasActiveFilters={hasActiveFilters}
               onChange={updateFilters}
               onClearFilters={clearFilters}
             />
@@ -82,7 +81,6 @@ export default function TasksPage() {
               isLoading={isLoading}
               error={error}
               hasActiveFilters={hasActiveFilters}
-              statusFilter={filters.status}
               onEdit={openEdit}
               onPageChange={(page) => setFilters((prev) => ({ ...prev, page }))}
               onRetry={() => void refetch()}

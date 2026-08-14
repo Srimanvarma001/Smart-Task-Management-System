@@ -2,50 +2,23 @@ import { useState } from "react";
 import { getApiErrorMessage } from "../../../api/axiosClient";
 import Button from "../../../components/ui/Button";
 import Modal from "../../../components/ui/Modal";
-import { useTaskFade } from "../hooks/useTaskFade";
 import { useDeleteTask, useToggleTaskStatus } from "../hooks/useTaskMutations";
-import type { Task, TaskPriority } from "../types";
+import { formatDueDate, isTaskOverdue, priorityBadge, priorityBorder, priorityLabel } from "../taskUtils";
+import type { Task } from "../types";
 
 interface TaskCardProps {
   task: Task;
   onEdit: (task: Task) => void;
-  fadeWhenCompleted?: boolean;
-  onFadeComplete?: (taskId: string) => void;
 }
 
-const priorityBorder: Record<TaskPriority, string> = {
-  low: "border-l-priorityLow",
-  medium: "border-l-priorityMedium",
-  high: "border-l-priorityHigh",
-};
-
-const priorityBadge: Record<TaskPriority, string> = {
-  low: "bg-priorityLow/15 text-priorityLow dark:bg-priorityLow/25 dark:text-priorityLow",
-  medium: "bg-priorityMedium/15 text-priorityMedium dark:bg-priorityMedium/25 dark:text-priorityMedium",
-  high: "bg-priorityHigh/15 text-priorityHigh dark:bg-priorityHigh/25 dark:text-priorityHigh",
-};
-
-const priorityLabel: Record<TaskPriority, string> = {
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-};
-
-function formatDueDate(dueDate: string): string {
-  const date = new Date(dueDate);
-  if (Number.isNaN(date.getTime())) return dueDate;
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-export default function TaskCard({ task, onEdit, fadeWhenCompleted = false, onFadeComplete }: TaskCardProps) {
+export default function TaskCard({ task, onEdit }: TaskCardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const toggleStatus = useToggleTaskStatus();
   const deleteTask = useDeleteTask();
 
   const completed = task.status === "completed";
-  const fadeEnabled = completed && fadeWhenCompleted && Boolean(onFadeComplete);
-  const fading = useTaskFade(task._id, fadeEnabled, onFadeComplete);
+  const overdue = isTaskOverdue(task);
   const meta = [
     task.dueDate ? `Due ${formatDueDate(task.dueDate)}` : null,
     task.category,
@@ -71,9 +44,9 @@ export default function TaskCard({ task, onEdit, fadeWhenCompleted = false, onFa
   return (
     <li className="list-none">
       <div
-        className={`flex items-start gap-3 rounded-sm border border-ink/10 border-l-4 bg-white px-3 py-2 motion-safe:transition-opacity motion-safe:duration-700 dark:border-paper/10 dark:bg-ink ${
-          priorityBorder[task.priority]
-        } ${fading ? "opacity-0" : completed ? "opacity-60" : ""}`}
+        className={`flex items-start gap-3 rounded-sm border border-ink/10 border-l-4 bg-white px-3 py-2 dark:border-paper/10 dark:bg-ink ${
+          overdue ? "border-l-priorityHigh" : priorityBorder[task.priority]
+        } ${completed ? "opacity-60" : ""}`}
       >
         <input
           type="checkbox"
@@ -108,6 +81,7 @@ export default function TaskCard({ task, onEdit, fadeWhenCompleted = false, onFa
               }`}
             >
               {meta}
+              {overdue && <span className="font-semibold text-priorityHigh"> &middot; Overdue</span>}
             </p>
           )}
         </div>

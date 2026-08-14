@@ -28,6 +28,7 @@ export interface TaskFilters {
   sort?: TaskSort;
   order?: SortOrder;
   page?: number;
+  limit?: number;
 }
 
 export interface TaskListResponse {
