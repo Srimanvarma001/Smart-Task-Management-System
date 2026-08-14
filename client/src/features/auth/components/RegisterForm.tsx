@@ -48,37 +48,65 @@ export default function RegisterForm({ onSwitch }: RegisterFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
-      <h1 className="font-display text-2xl">Create an account</h1>
+      <div>
+        <p className="font-mono text-xs uppercase tracking-widest text-focus">Create account</p>
+        <h1 className="mt-1 font-display text-2xl font-medium">Create your account</h1>
+        <p className="mt-1 text-sm text-ink/60 dark:text-paper/60">
+          A few details and you&apos;re ready to go.
+        </p>
+      </div>
       {error && (
         <p role="alert" className="rounded border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-600">
           {error}
         </p>
       )}
-      <Input
-        placeholder="Name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        autoComplete="name"
-        required
-      />
-      <Input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        autoComplete="email"
-        required
-      />
-      <Input
-        type="password"
-        placeholder="Password (min 8 characters)"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        autoComplete="new-password"
-        required
-      />
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? "Creating account..." : "Register"}
+      <div>
+        <label htmlFor="register-name" className="mb-1 block text-sm font-medium">
+          Name
+        </label>
+        <Input
+          id="register-name"
+          placeholder="Your name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoComplete="name"
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="register-email" className="mb-1 block text-sm font-medium">
+          Email
+        </label>
+        <Input
+          id="register-email"
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="register-password" className="mb-1 block text-sm font-medium">
+          Password
+        </label>
+        <Input
+          id="register-password"
+          type="password"
+          placeholder="At least 8 characters"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
+          required
+        />
+      </div>
+      <Button
+        type="submit"
+        className="w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        disabled={loading}
+      >
+        {loading ? "Creating account..." : "Create account"}
       </Button>
       {onSwitch && (
         <p className="text-sm text-ink/60 dark:text-paper/60">
@@ -86,7 +114,7 @@ export default function RegisterForm({ onSwitch }: RegisterFormProps) {
           <button
             type="button"
             onClick={onSwitch}
-            className="font-medium text-focus hover:underline"
+            className="rounded font-medium text-focus hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
             Sign in
           </button>
