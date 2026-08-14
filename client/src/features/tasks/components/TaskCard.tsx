@@ -94,7 +94,7 @@ export default function TaskCard({ task, onEdit, fadeWhenCompleted = false, onFa
           </button>
           {task.description && (
             <p
-              className={`mt-0.5 text-sm ${
+              className={`mt-0.5 line-clamp-2 text-sm ${
                 completed ? "text-ink/40 dark:text-paper/40" : "text-ink/70 dark:text-paper/70"
               }`}
             >

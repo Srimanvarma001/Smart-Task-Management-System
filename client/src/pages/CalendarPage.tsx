@@ -10,7 +10,7 @@ export default function CalendarPage() {
         <Navbar />
         <div className="flex">
           <Sidebar />
-          <main className="flex-1 space-y-4 p-6">
+          <main className="min-w-0 flex-1 space-y-4 p-4 sm:p-6">
             <Calendar />
           </main>
         </div>

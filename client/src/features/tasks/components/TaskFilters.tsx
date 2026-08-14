@@ -51,8 +51,12 @@ export default function TaskFilters({
   };
 
   return (
-    <div className="flex flex-wrap items-end gap-2" role="group" aria-label="Task filters">
-      <div className="flex min-w-0 flex-1 basis-40 flex-col gap-1">
+    <div
+      className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end"
+      role="group"
+      aria-label="Task filters"
+    >
+      <div className="flex min-w-0 flex-col gap-1 sm:min-w-0 sm:flex-1 sm:basis-40">
         <label htmlFor="filter-search" className="font-mono text-xs text-ink/50 dark:text-paper/50">
           Search
         </label>
