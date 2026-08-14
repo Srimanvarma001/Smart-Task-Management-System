@@ -5,13 +5,21 @@ import AISummaryCard from "../features/ai/components/AISummaryCard";
 import AISuggestionList from "../features/ai/components/AISuggestionList";
 import NLTaskInput from "../features/ai/components/NLTaskInput";
 import CategoryBreakdown from "../features/dashboard/components/CategoryBreakdown";
+import DueSoonBanner from "../features/dashboard/components/DueSoonBanner";
 import StatsCards from "../features/dashboard/components/StatsCards";
 import TrendIndicator from "../features/dashboard/components/TrendIndicator";
 import UpcomingDeadlines from "../features/dashboard/components/UpcomingDeadlines";
 import { useTaskStats } from "../features/dashboard/hooks/useTaskStats";
+import { useTasks } from "../features/tasks/hooks/useTasks";
 
 export default function DashboardPage() {
   const { data, isLoading, isError } = useTaskStats();
+  const { data: taskData, isLoading: tasksLoading } = useTasks({
+    status: "pending",
+    sort: "dueDate",
+    order: "asc",
+    limit: 50,
+  });
 
   return (
     <SidebarProvider>
@@ -20,6 +28,7 @@ export default function DashboardPage() {
         <div className="flex">
           <Sidebar />
           <main className="min-w-0 flex-1 space-y-4 p-4 sm:p-6">
+            <DueSoonBanner tasks={taskData?.tasks} isLoading={tasksLoading} />
             <StatsCards stats={data} isLoading={isLoading} />
             {isError && (
               <p className="text-sm text-ink/70 dark:text-paper/70">

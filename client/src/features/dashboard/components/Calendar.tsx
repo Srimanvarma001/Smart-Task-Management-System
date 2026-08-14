@@ -1,10 +1,8 @@
-import { useCallback, useMemo, useRef, useState, type FormEvent, type MouseEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { getApiErrorMessage } from "../../../api/axiosClient";
 import Button from "../../../components/ui/Button";
-import { useTaskFade } from "../../tasks/hooks/useTaskFade";
 import { useCreateTask, useToggleTaskStatus } from "../../tasks/hooks/useTaskMutations";
 import { useTasks } from "../../tasks/hooks/useTasks";
-import { getHiddenTaskIds, hideTask, pruneHiddenTaskIds } from "../../tasks/taskVisibility";
 import type { Task, TaskPriority } from "../../tasks/types";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -75,18 +73,16 @@ function topPriorityOf(tasks: Task[]): TaskPriority {
 
 interface DayTaskRowProps {
   task: Task;
-  onFadeComplete: (taskId: string) => void;
 }
 
-function DayTaskRow({ task, onFadeComplete }: DayTaskRowProps) {
+function DayTaskRow({ task }: DayTaskRowProps) {
   const completed = task.status === "completed";
   const toggleStatus = useToggleTaskStatus();
-  const fading = useTaskFade(task._id, completed, onFadeComplete);
 
   return (
     <li
-      className={`flex items-center gap-2 motion-safe:transition-opacity motion-safe:duration-700 ${
-        fading ? "opacity-0" : ""
+      className={`flex items-center gap-2 ${
+        completed ? "opacity-60" : ""
       }`}
     >
       <input
@@ -124,7 +120,6 @@ export default function Calendar() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => getHiddenTaskIds());
   const createTask = useCreateTask();
 
   const { year, month } = visible;
@@ -140,19 +135,10 @@ export default function Calendar() {
     order: "asc",
   });
 
-  if (pruneHiddenTaskIds(data?.tasks ?? [])) {
-    setHiddenIds(new Set(getHiddenTaskIds()));
-  }
-
-  const handleFadeComplete = useCallback((taskId: string) => {
-    hideTask(taskId);
-    setHiddenIds(new Set(getHiddenTaskIds()));
-  }, []);
-
   const tasksByDay = useMemo(() => {
     const byDay = new Map<string, Task[]>();
     for (const task of data?.tasks ?? []) {
-      if (!task.dueDate || hiddenIds.has(task._id)) continue;
+      if (!task.dueDate || task.status === "completed") continue;
       const due = new Date(task.dueDate);
       if (Number.isNaN(due.getTime())) continue;
       const key = toDateKey(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
@@ -164,7 +150,7 @@ export default function Calendar() {
       }
     }
     return byDay;
-  }, [data, hiddenIds]);
+  }, [data]);
 
   const cells = useMemo<CalendarCell[]>(() => {
     const result: CalendarCell[] = [];
@@ -380,7 +366,7 @@ export default function Calendar() {
           {selectedTasks.length > 0 ? (
             <ul className="mt-2 space-y-2">
               {selectedTasks.map((task) => (
-                <DayTaskRow key={task._id} task={task} onFadeComplete={handleFadeComplete} />
+                <DayTaskRow key={task._id} task={task} />
               ))}
             </ul>
           ) : (
