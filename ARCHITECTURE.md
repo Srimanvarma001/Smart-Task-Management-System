@@ -61,6 +61,9 @@ flowchart LR
     SVC -- "chat completions<br/>(JSON-only prompts)" --> AI
 ```
 
+![Request flow](docs/screenshots/request-flow.png)
+*End-to-end request flow: browser → Express API → MongoDB / DeepSeek → response*
+
 **Auth flow (high level):** on login/register the server returns a JWT (1h expiry) alongside the user. The client stores it in `localStorage` under the key `token` (`features/auth/context/AuthContext.tsx`). An Axios request interceptor (`api/axiosClient.ts`) attaches it as `Authorization: Bearer <token>` on every request. Server-side, `middleware/auth.middleware.ts` verifies the token with `jsonwebtoken`, attaches `req.user = { id }`, and rejects with 401 if missing, malformed, or expired. A client response interceptor clears the stored token and redirects to `/login` on any 401.
 
 ---
@@ -144,6 +147,57 @@ A concrete walkthrough of creating a task from natural language, using the real 
 8. Confirmation triggers `useCreateTask` → `taskApi.createTask` → **`POST /api/tasks`** with `aiGenerated: true`.
 9. The server validates the body with Zod (`createTaskSchema`), then `taskService.createTask` re-checks the AI-provided priority (only trusted when `aiGenerated: true`), infers tags server-side via `inferTags`, and writes the document with `TaskModel.create` — always scoped to `req.user.id`.
 10. `useCreateTask`'s `onSuccess` invalidates the `["tasks"]` and `["tasks", "stats"]` query keys; React Query refetches both, and the task list plus dashboard stats update immediately.
+
+---
+
+## Detailed Request Flows
+
+### Login authentication flow
+
+![Login flow](docs/screenshots/flow-auth-login.png)
+
+`LoginForm`'s `handleSubmit` (`features/auth/components/LoginForm.tsx`) calls `AuthContext.login` (`features/auth/context/AuthContext.tsx`), which delegates to `authApi.login` — a POST to `/auth/login` through the shared `axiosClient`. The server chain runs `authLimiter` → `validate(loginSchema)` (Zod) → `authController.login` → `authService.login`, which executes `UserModel.findOne({ email }).select("+passwordHash")` (the field is `select: false` by default) and compares with `bcrypt.compare` before signing a JWT via `signToken` (HS256, 1h expiry, payload `{ id }`). The client stores the token in `localStorage` under the key `token`; the request interceptor in `api/axiosClient.ts` attaches it as `Authorization: Bearer <token>` on every subsequent request, and the response interceptor clears it and redirects to `/login` on any 401.
+
+### Protected request flow
+
+![Protected request flow](docs/screenshots/flow-protected-request.png)
+
+The request interceptor (`api/axiosClient.ts`) reads `localStorage["token"]` and attaches `Authorization: Bearer <token>`; any 401 response clears the token and hard-redirects to `/login`. On the server the chain is `apiLimiter` → `authenticate` (`middleware/auth.middleware.ts`, which runs `jwt.verify` and attaches `req.user = { id }`) → `validate(querySchema, "query")` (Zod defaults: `sort=createdAt`, `order=desc`, `page=1`, `limit=10`) → `taskController.listTasks` → `taskService.listTasks`. The service always scopes the filter to `userId`, adds optional `status`/`priority`/`category` equality, a case-insensitive `$or` regex on `title`/`description` for `search`, and a `dueDate` `$gte`/`$lte` range, then runs `TaskModel.find(...).sort().skip().limit().lean()` and `countDocuments` in parallel; every success is wrapped in the `ok()` envelope `{ success: true, data }` (`utils/ApiResponse.ts`).
+
+### AI parse flow
+
+![AI parse flow](docs/screenshots/flow-ai-parse.png)
+
+`NLTaskInput`'s `handleSubmit` (`features/ai/components/NLTaskInput.tsx`) submits the free text through the `useAIParse` mutation → `aiApi.parseTask` → `POST /api/ai/parse`. Server-side the chain is `authenticate` → `aiLimiter` → `aiController.parseTask` → `aiService.parseTaskFromText`, which requires non-empty `text`, then calls `callDeepSeek` (`config/deepseek.ts`: POST to `https://api.deepseek.com/chat/completions`, model `deepseek-v4-flash`, `response_format: json_object`, 15s `AbortController` timeout). The service strictly validates the reply — non-empty `title`, priority within `low|medium|high`, `dueDate` a parseable ISO string — and throws `AppError(502)` for malformed output (never a 500). On success the client opens the "Review your AI-parsed task" modal with `TaskForm` pre-filled from the parsed draft; nothing has been written to the database yet.
+
+### AI confirm and create flow
+
+![AI confirm and create flow](docs/screenshots/flow-ai-confirm.png)
+
+Confirming in `TaskForm`'s `handleSubmit` builds the payload with the parsed fields, the reviewed priority, and `aiGenerated: true`, then runs `useCreateTask` → `taskApi.createTask` → `POST /api/tasks`. Server-side: `authenticate` → `validate(createTaskSchema)` → `taskController.createTask` → `taskService.createTask`, which re-validates the AI-provided priority with `normalizePriority` (only trusted when `aiGenerated === true`), falls back to server-side `inferPriority` when invalid or missing, and always infers tags via `inferTags` before `TaskModel.create` writes the document. The 201 `ok(task)` response triggers `useCreateTask`'s `onSuccess`, which invalidates the `["tasks"]` and `["tasks", "stats"]` query keys so the task list and dashboard refetch.
+
+### Error handling matrix
+
+Errors land in one of two places: middleware that responds **directly** (without `next(err)`) — `validate`, `authenticate`, the rate limiters, `notFound` — or `asyncHandler` (`utils/asyncHandler.ts`), whose `.catch(next)` forwards rejected promises to `errorHandler` (`middleware/error.middleware.ts`), which branches on error type in a fixed order: `AppError` → `ZodError` → Mongoose `ValidationError` → Mongo 11000 duplicate key → generic 500.
+
+| Failure case | Thrown at | Caught by | Resulting response |
+|---|---|---|---|
+| Invalid request body/query | `validate` middleware (`middleware/validate.ts`) | direct (returns before `next()`) | `400 { error: "Validation failed", issues: [...] }` |
+| Missing/malformed auth header | `authenticate` (`middleware/auth.middleware.ts`) | direct | `401 { error: "Authorization header missing or malformed" }` |
+| Invalid or expired token | `authenticate` — `jwt.verify` catch | direct | `401 { error: "Invalid or expired token" }` |
+| Missing `req.user` in controller | task/auth/ai controllers' `userId` guard | direct | `401 { error: "Unauthorized" }` |
+| Bad credentials | `authService.login` — `AppError(401)` | `asyncHandler` → `errorHandler` (AppError branch) | `401 { error: "Invalid credentials" }` |
+| Duplicate email on register | `authService.register` pre-check `AppError(409)`; race condition surfaces as Mongo 11000 | `errorHandler` AppError / 11000 branch | `409 { error: "Email is already registered" }` or `409 { error: 'Duplicate value for "email"' }` |
+| Wrong owner / missing task | `taskService` — `assertValidTaskId` or null `findOne` result, `AppError(404)` | `asyncHandler` → `errorHandler` | `404 { error: "Task not found" }` |
+| Missing `text` on `/ai/parse` | `requireText` (`ai.service.ts`) — `AppError(400)` | `asyncHandler` → `errorHandler` | `400 { error: "text is required" }` |
+| DeepSeek timeout / network failure / non-200 / empty reply | `callDeepSeek` (`config/deepseek.ts`) — `AppError(502)` | `asyncHandler` → `errorHandler` | `502 { error: "AI service unavailable: ..." }` or `502 { error: "AI service returned status ..." }` |
+| AI returned malformed/invalid JSON | `aiService` (`ai.service.ts`) — `AppError(502)` | `asyncHandler` → `errorHandler` | `502 { error: "AI returned malformed JSON" }` / `"AI returned an invalid task title"` / `"...invalid priority"` / `"...invalid dueDate"` |
+| AI inference failure during create | `inferPriority` / `inferTags` try/catch (`ai.service.ts`) | swallowed by design | no error — falls back to `"Medium"` / `[]` |
+| Mongoose validation failure | `TaskModel` / `UserModel` `ValidationError` | `errorHandler` (Mongoose branch) | `400 { error: "Validation failed", issues }` |
+| Rate limit exceeded | `apiLimiter` / `authLimiter` / `aiLimiter` (`middleware/rateLimiter.ts`) | direct (express-rate-limit rejects) | `429` with `RateLimit-*` headers |
+| Disallowed CORS origin | `cors` origin callback — `AppError(403)` (`app.ts`) | `errorHandler` | `403 { error: "Not allowed by CORS" }` |
+| Unknown route | `notFound` (`middleware/error.middleware.ts`) | direct | `404 { error: "Not found" }` |
+| Any unhandled error | anywhere in services/controllers | `errorHandler` fallback + `logger.error` | `500 { error: "Internal server error" }` |
 
 ---
 
