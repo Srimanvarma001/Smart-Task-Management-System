@@ -19,10 +19,30 @@ const emptyStats: TaskStats = {
 };
 
 const cards = [
-  { key: "total", label: "Total" },
-  { key: "completed", label: "Completed" },
-  { key: "pending", label: "Pending" },
-  { key: "overdue", label: "Overdue" },
+  {
+    key: "total",
+    label: "Total",
+    accent: "bg-focus",
+    valueClass: "text-focus dark:text-indigo-400",
+  },
+  {
+    key: "completed",
+    label: "Completed",
+    accent: "bg-priorityLow",
+    valueClass: "text-priorityLow dark:text-teal-400",
+  },
+  {
+    key: "pending",
+    label: "Pending",
+    accent: "bg-priorityMedium",
+    valueClass: "text-priorityMedium dark:text-orange-400",
+  },
+  {
+    key: "overdue",
+    label: "Overdue",
+    accent: "bg-priorityHigh",
+    valueClass: "text-priorityHigh dark:text-red-400",
+  },
 ] as const;
 
 export default function StatsCards({ stats = emptyStats, isLoading }: StatsCardsProps) {
@@ -63,15 +83,12 @@ export default function StatsCards({ stats = emptyStats, isLoading }: StatsCards
       {cards.map((card) => (
         <div
           key={card.key}
-          className="rounded-sm border border-ink/10 bg-white p-4 dark:border-paper/10 dark:bg-ink"
+          className="rounded-sm border border-ink/10 bg-white p-4 transition hover:-translate-y-0.5 hover:border-ink/20 hover:shadow-md dark:border-paper/10 dark:bg-ink dark:hover:border-paper/20 dark:hover:shadow-black/20"
         >
-          <p
-            className={`font-mono text-2xl ${
-              card.key === "overdue" ? "text-priorityHigh" : "text-ink dark:text-paper"
-            }`}
-          >
-            {stats[card.key]}
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className={`font-mono text-2xl ${card.valueClass}`}>{stats[card.key]}</p>
+            <span aria-hidden="true" className={`h-2 w-2 rounded-full ${card.accent}`} />
+          </div>
           <p className="mt-1 text-xs text-ink/50 dark:text-paper/50">{card.label}</p>
         </div>
       ))}

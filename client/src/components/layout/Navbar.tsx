@@ -15,7 +15,7 @@ export default function Navbar() {
   const { collapsed, toggle, openMobile } = useSidebar();
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-ink/10 bg-paper px-4 py-3 text-ink dark:border-paper/10 dark:bg-ink dark:text-paper sm:px-6 sm:py-4">
+    <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-ink/10 bg-paper/85 px-4 py-3 text-ink backdrop-blur-md dark:border-paper/10 dark:bg-ink/85 dark:text-paper sm:px-6 sm:py-4">
       <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"
@@ -33,6 +33,7 @@ export default function Navbar() {
         >
           <HamburgerIcon />
         </button>
+        <span className="hidden h-6 w-1.5 shrink-0 rounded-sm bg-focus sm:block" aria-hidden="true" />
         <span className="truncate font-display text-base sm:text-lg">Smart Task Manager</span>
       </div>
       <DarkModeToggle />

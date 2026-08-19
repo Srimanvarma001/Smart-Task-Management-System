@@ -44,7 +44,7 @@ export default function TaskCard({ task, onEdit }: TaskCardProps) {
   return (
     <li className="list-none">
       <div
-        className={`flex items-start gap-3 rounded-sm border border-ink/10 border-l-4 bg-white px-3 py-2 dark:border-paper/10 dark:bg-ink ${
+        className={`flex items-start gap-3 rounded-sm border border-ink/10 border-l-4 bg-white px-3 py-2.5 transition hover:shadow-md dark:border-paper/10 dark:bg-ink dark:hover:shadow-black/20 ${
           overdue ? "border-l-priorityHigh" : priorityBorder[task.priority]
         } ${completed ? "opacity-60" : ""}`}
       >
